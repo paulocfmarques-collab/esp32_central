@@ -9,43 +9,50 @@
 
 </div>
 
-A touchscreen-based ESP32 control center for monitoring and commanding remote ESP32 nodes over a local Wi-Fi network. The firmware combines a TFT/XPT2046 interface, UDP communication, local diagnostics, and an automatic Wi-Fi configuration portal.
+A touchscreen-based ESP32 control center for monitoring and controlling remote ESP32 nodes over a local Wi‑Fi network. The firmware combines a TFT display, XPT2046 touch input, UDP communication, Wi‑Fi configuration portal, NTP time sync, OTA updates, and a local/remote command interface in a single project.
 
 ## Contents
 
 - [Overview](#overview)
 - [Architecture](#architecture)
+- [Project structure](#project-structure)
 - [Hardware](#hardware)
-- [Software](#software)
+- [Software and modules](#software-and-modules)
 - [Command protocol](#command-protocol)
 - [Installation](#installation)
 - [Network configuration](#network-configuration)
+- [Usage](#usage)
 - [Troubleshooting](#troubleshooting)
+- [Security](#security)
+- [License](#license)
 
 ## Overview
 
 The central controller can:
 
-- select `ESP1` or `ESP2` as the target node
-- send control and diagnostic commands over UDP
-- display responses on a 2.8-inch touchscreen
-- execute supported commands locally
-- store Wi-Fi credentials in ESP32 NVS storage
-- start a fallback access point when no saved network is available
+- switch between `LOCAL` and `REMOTE` modes
+- select `ESP 1` or `ESP 2` as the remote target
+- send commands over UDP on port `4210`
+- receive and display responses on a 320x240 TFT screen
+- execute commands locally on the ESP32 master itself
+- save Wi‑Fi credentials using `Preferences`
+- start a fallback access point named `ESP32_CENTRAL_CONFIG`
 - control the local LED and auxiliary output
+- synchronize date/time using NTP
+- apply network OTA updates
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    User[User] --> Touch[TFT touchscreen]
+    User[User] --> Touch[TFT display + XPT2046]
     Touch --> Central[ESP32 Central]
-    Central --> WiFi[Wi-Fi LAN]
-    WiFi --> Node1[Remote ESP32 1<br/>192.168.0.120]
-    WiFi --> Node2[Remote ESP32 2<br/>192.168.0.125]
+    Central --> WiFi[Wi‑Fi LAN]
+    WiFi --> Node1[ESP32 Slave 1<br/>192.168.0.120]
+    WiFi --> Node2[ESP32 Slave 2<br/>192.168.0.125]
     Node1 --> Central
     Node2 --> Central
-    Central --> Display[Result screen]
+    Central --> Display[Response screen / command panel]
 ```
 
 ### Command and response flow
@@ -54,14 +61,14 @@ flowchart LR
 sequenceDiagram
     participant U as User
     participant C as ESP32 Central
-    participant R as Remote ESP32
+    participant R as ESP32 Slave
 
-    U->>C: Select node and tap command
-    C->>C: Map touch coordinates to command
-    C->>R: UDP command on port 4210
+    U->>C: Select mode and tap a button
+    C->>C: Interpret touch and resolve command
+    C->>R: Send UDP packet on port 4210
     R-->>C: Text response
-    C->>C: Parse and render response
-    C-->>U: Display result
+    C->>C: Parse, display, and accumulate response
+    C-->>U: Show result on screen
 ```
 
 ### Startup and configuration flow
@@ -69,16 +76,29 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     Start([Power on]) --> Init[Initialize display, touch and GPIO]
-    Init --> Credentials{Saved Wi-Fi credentials?}
+    Init --> Credentials{Saved Wi‑Fi credentials?}
     Credentials -- Yes --> Connect[Connect in station mode]
     Credentials -- No --> Portal[Start configuration access point]
     Connect --> Connected{Connected?}
-    Connected -- Yes --> Ready[Start UDP and render control UI]
+    Connected -- Yes --> Ready[Start UDP and load main UI]
     Connected -- No --> Portal
     Portal --> Configure[Open 192.168.4.1]
-    Configure --> Save[Save SSID and password to NVS]
+    Configure --> Save[Save SSID, password and IPs in Preferences]
     Save --> Restart[Restart ESP32]
 ```
+
+## Project structure
+
+The main files in this repository are:
+
+- `Central.ino` — firmware entry point
+- `Display.h` / `Display.cpp` — TFT abstraction layer
+- `InterfaceCentral.h` / `InterfaceCentral.cpp` — main interface, buttons, and touch handling
+- `WifiConfig.h` / `WifiConfig.cpp` — Wi‑Fi connection and configuration portal
+- `UdpComm.h` / `UdpComm.cpp` — UDP communication with slave nodes
+- `CommandHandler.h` — local command execution and OTA handling
+- `NTPUtil.h` — time synchronization via NTP
+- `Botao.h` — screen/button constants and definitions
 
 ## Hardware
 
@@ -88,19 +108,19 @@ flowchart TD
 - 2.8-inch SPI TFT display
 - XPT2046 touch controller
 - LED connected to GPIO 4
-- auxiliary output connected to GPIO 21
-- USB or 5 V power supply
-- local Wi-Fi network
+- auxiliary output on GPIO 21
+- USB or 5V power supply
+- local Wi‑Fi network
 
 ### Pin mapping
 
 | Function | GPIO | Description |
 | --- | ---: | --- |
 | Touch CLK | 25 | XPT2046 SPI clock |
-| Touch MISO | 39 | XPT2046 SPI input |
-| Touch MOSI | 32 | XPT2046 SPI output |
+| Touch MISO | 39 | Touch serial input |
+| Touch MOSI | 32 | Touch serial output |
 | Touch CS | 33 | XPT2046 chip select |
-| Status LED | 4 | Local LED control |
+| Status LED | 4 | Local central LED |
 | Auxiliary output | 21 | Additional digital output |
 
 ### Wiring overview
@@ -117,61 +137,96 @@ flowchart TD
     Auxiliary    ------> | GPIO 21              |
                          +----------+-----------+
                                     |
-                              Wi-Fi LAN
+                              Wi‑Fi LAN
                          +----------+-----------+
                          |                      |
                  +-------+-------+      +-------+-------+
-                 | Remote ESP32  |      | Remote ESP32  |
+                 | ESP32 Slave    |      | ESP32 Slave    |
                  | 192.168.0.120 |      | 192.168.0.125 |
                  +---------------+      +---------------+
 ```
 
-> Confirm the display controller's pinout before wiring. The display SPI configuration is handled by `TFT_eSPI`; the touch controller uses the pins listed above.
+> Confirm the display driver and pinout before wiring the hardware.
 
-## Software
+## Software and modules
 
-The project is implemented in [`Mestre_2.ino`](./Mestre_2.ino) and uses:
+The firmware uses the following libraries and modules:
 
 - `TFT_eSPI` for display rendering
 - `XPT2046_Touchscreen` for touch input
 - `WiFi` for network connectivity
-- `WiFiUdp` for command transport
 - `WebServer` for the configuration portal
-- `Preferences` for persistent Wi-Fi settings
+- `Preferences` for persistent Wi‑Fi and IP settings
+- `WiFiUdp` for UDP command transport
+- `ArduinoOTA` for over-the-air updates
+- `time.h` and NTP for clock synchronization
 
-### Main firmware responsibilities
+### Main responsibilities
 
-| Function | Responsibility |
+| Module | Responsibility |
 | --- | --- |
-| `setup()` | Initialize hardware, Wi-Fi, UDP and the user interface |
-| `loop()` | Process touch input, UDP packets and LED blinking |
-| `processarClique()` | Detect target and command button selections |
-| `enviarComandoUDP()` | Send a command to the selected remote node |
-| `verificarMensagensUDP()` | Receive and process UDP responses |
-| `executa_comando_local()` | Execute supported commands on the central ESP32 |
-| `iniciarPortal()` | Start the Wi-Fi configuration access point |
-| `salvarWifi()` | Persist credentials and restart the board |
+| `setup()` | Initialize hardware, Wi‑Fi, UDP and the UI |
+| `loop()` | Process touch, UDP packets, timers and LED states |
+| `InterfaceCentral::escanearToque()` | Detect button press |
+| `UdpComm::enviarComando()` | Send a command to the selected slave |
+| `UdpComm::escutarResposta()` | Receive and classify incoming reply |
+| `CommandHandler::executar()` | Execute local commands and handle responses |
+| `WifiConfig::iniciarPortal()` | Start the configuration access point |
+| `NTPUtil::initNTP()` | Synchronize the real-time clock |
+| `OtaManager::inicializar()` | Configure OTA updates |
 
 ## Command protocol
 
-Commands are plain-text UDP packets sent to port `4210`.
+The project uses plain-text UDP packets on port `4210`.
 
-| Command | Purpose |
+### Local commands executed by the central
+
+| Command | Description |
 | --- | --- |
-| `LED_ON` | Turn on the target LED |
-| `LED_OFF` | Turn off the target LED |
-| `LED_BLINK:500` | Blink the LED every 500 ms |
+| `LED_ON` | Turn on the local LED |
+| `LED_OFF` | Turn off the local LED |
+| `LED_BLINK:500` | Blink with the given interval in ms |
 | `TEMP` | Read CPU temperature |
-| `CPU` | Read chip model, revision, cores and frequency |
-| `RAM` | Read heap information |
-| `FLASH` | Read flash capacity, speed and sketch size |
-| `INIT` | Read the reset reason |
-| `UPTIME` | Read uptime in milliseconds |
-| `MAC` | Read the MAC address |
-| `NET_INFO` | Read IP, gateway, subnet mask and RSSI |
-| `RESET_WIFI` | Clear saved Wi-Fi credentials and restart |
+| `CPU` | Display model, cores and clock frequency |
+| `RAM` | Show heap usage and free memory |
+| `FLASH` | Display flash size and speed |
+| `UPTIME` | Show runtime in milliseconds |
+| `MAC` | Show MAC address |
+| `NET_INFO` | Display IP, RSSI and SSID |
+| `INFO` | Show full device information |
+| `VERSION` | Firmware version |
+| `BUILD` | Build date and time |
+| `STATUS` | System status summary |
+| `LASTCMD` | Last processed command |
+| `CMDCOUNT` | Number of processed commands |
+| `TIME` | Current time |
+| `DATE` | Current date |
+| `SET_FUSO:<value>` | Adjust local timezone |
+| `SET_ESCRAVO1:<IP>` | Update slave 1 IP |
+| `SET_ESCRAVO2:<IP>` | Update slave 2 IP |
+| `RESET_WIFI` | Clear saved Wi‑Fi data and restart |
+| `DESLIGAR` | Enter deep sleep |
 
-### Example client
+### Remote commands sent to slave devices
+
+The remote panel sends commands such as:
+
+- `LED_ON`
+- `LED_OFF`
+- `LED_BLINK:1000`
+- `TEMP`
+- `CPU`
+- `RAM`
+- `INFO`
+- `VERSION`
+- `BUILD`
+- `STATUS`
+- `UPTIME`
+- `NET_INFO`
+- `CMDCOUNT`
+- `LASTCMD`
+
+### Example Python client
 
 ```python
 import socket
@@ -186,33 +241,19 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
     print(f"{address}: {response.decode().strip()}")
 ```
 
-## Touchscreen interface
-
-The main screen provides target selection and 12 actions:
-
-```text
-+------------------------------------------------+
-|              CENTRAL HIBRIDA TOTAL            |
-+----------------------+-------------------------+
-|      ESP 1 (120)     |       ESP 2 (125)       |
-+----------+-----------+-----------+-------------+
-| LED ON   | LED OFF   | BLINK     | VER TEMP    |
-+----------+-----------+-----------+-------------+
-| INFO CPU | RAM FREE  | FLASH INF | RST MOTIV   |
-+----------+-----------+-----------+-------------+
-| UPTIME   | END MAC   | REDE INFO | RST WIFI    |
-+----------+-----------+-----------+-------------+
-```
-
-A response screen displays returned text. Touching the screen returns to the main interface.
-
 ## Installation
 
 ### Arduino IDE
 
-1. Install the ESP32 board package.
-2. Install `TFT_eSPI` and `XPT2046_Touchscreen` through the Library Manager.
-3. Configure `TFT_eSPI/User_Setup.h` for the connected display:
+1. Install ESP32 support in the Arduino IDE.
+2. Install the `TFT_eSPI` and `XPT2046_Touchscreen` libraries.
+3. Configure `TFT_eSPI/User_Setup.h` for your display module.
+4. Open `Central.ino`.
+5. Select the appropriate ESP32 board, such as `ESP32 Dev Module`.
+6. Compile and upload the sketch.
+7. Open the serial monitor at `115200` baud to diagnose startup issues.
+
+### Example display setup
 
 ```cpp
 #define TFT_MOSI 23
@@ -222,28 +263,30 @@ A response screen displays returned text. Touching the screen returns to the mai
 #define TFT_DC   2
 ```
 
-4. Open `Mestre_2.ino`.
-5. Select the appropriate ESP32 board, such as **ESP32 Dev Module**.
-6. Compile and upload the sketch.
-7. Open the serial monitor at `115200` baud when diagnosing startup behavior.
-
 ## Network configuration
 
 ### Normal operation
 
-The controller reads the SSID and password from the `wifi` NVS namespace. When the connection succeeds, it starts UDP on port `4210` and displays the main control interface.
+On boot, the central tries to read the SSID and password from the `wifi` namespace in `Preferences`.
+
+If it connects successfully:
+
+- it runs in station mode
+- enables UDP on port `4210`
+- shows the main central interface
+- starts NTP synchronization after startup
 
 ### First-time configuration
 
-If credentials are missing or the connection cannot be established:
+If no Wi‑Fi credentials are saved, or connection fails:
 
-1. Connect to the access point `ESP32_CENTRAL_CONFIG`.
-2. Open `http://192.168.4.1`.
-3. Enter the network SSID and password.
-4. Save the form.
-5. Wait for the ESP32 to restart and connect.
+1. Connect to the access point `ESP32_CENTRAL_CONFIG`
+2. Open `http://192.168.4.1`
+3. Enter the SSID, password and slave IPs
+4. Save the settings
+5. Wait for the ESP32 to restart and reconnect
 
-### Remote node addresses
+### Slave addresses
 
 ```text
 ESP1: 192.168.0.120
@@ -251,46 +294,70 @@ ESP2: 192.168.0.125
 UDP port: 4210
 ```
 
-Update these values in the firmware if your network uses different addresses.
+> These values can also be changed via the configuration portal or through `SET_ESCRAVO1` and `SET_ESCRAVO2` commands.
+
+## Usage
+
+The main screen offers two initial modes:
+
+- `LOCAL` — runs commands on the master device itself
+- `REMOTE` — sends commands to the selected slave ESP32
+
+After selecting a mode, the screen shows command pages with navigation controls. You can move between pages and return to the initial menu.
+
+### Local mode
+
+This panel includes diagnostics, network status, NTP, memory usage, temperature, and system management commands.
+
+### Remote mode
+
+In remote mode, the user selects `ESP 1` or `ESP 2`, then sends commands through UDP to the corresponding slave. When a response arrives, the central displays it on screen and returns to the main menu after about 7 seconds.
 
 ## Troubleshooting
 
-### Display is blank
+### Screen stays blank
 
-- verify the TFT wiring and `TFT_eSPI` configuration
-- confirm the display driver is correct
-- test the display with a library example
+- verify the TFT wiring
+- confirm the correct driver in `TFT_eSPI`
+- test with a known working display example
 
-### Touch input does not work
+### Touch is not working
 
-- verify XPT2046 pins and chip select
-- check the touch rotation setting
-- recalibrate the coordinate mapping in `loop()`
-- confirm the pressure threshold is appropriate for the panel
+- confirm the XPT2046 pins and chip select
+- verify the touch rotation (`setRotation(1)`) 
+- test pressure filtering and coordinate limits
+- confirm the touch panel is correctly calibrated
 
-### Wi-Fi does not connect
+### Wi‑Fi does not connect
 
 - verify the SSID and password
-- move the board closer to the access point
-- use the `ESP32_CENTRAL_CONFIG` fallback network
-- clear credentials with `RESET_WIFI` when necessary
+- move the board closer to the router
+- use the fallback AP `ESP32_CENTRAL_CONFIG`
+- clear saved credentials with `RESET_WIFI`
 
 ### UDP commands do not work
 
 - confirm both devices are on the same LAN
-- verify the destination IP and UDP port `4210`
-- check firewall or client-isolation settings on the router
-- test the node with the Python example above
+- verify the target IP and port `4210`
+- check router firewall or client isolation rules
+- test using the Python example above
 
-## Security notes
+### NTP does not synchronize
 
-- UDP is connectionless and unauthenticated; use this project only on a trusted network.
-- The configuration portal is intended for local setup and should not be exposed to an untrusted network.
-- Avoid committing real Wi-Fi credentials to source control.
+- verify internet access
+- adjust the timezone using `SET_FUSO:<value>`
+- ensure the ESP32 is already connected before the NTP attempt
+
+## Security
+
+- UDP is connectionless and does not authenticate the sender
+- use the project only on trusted networks
+- keep the configuration portal on a local network and do not expose it publicly
+- avoid committing real credentials to public repositories
 
 ## License
 
-This project is distributed under the MIT License. See [`LICENSE`](./LICENSE) for details.
+This project is distributed under the MIT License. See [`LICENSE`](./LICENSE).
 
 ## Author
 
@@ -299,4 +366,4 @@ This project is distributed under the MIT License. See [`LICENSE`](./LICENSE) fo
 
 ## Support
 
-For questions, bugs or feature requests, please [open an issue](https://github.com/paulocfmarques-collab/esp32_central/issues).
+For questions, bugs, or feature requests, please open an [issue](https://github.com/paulocfmarques-collab/esp32_central/issues).

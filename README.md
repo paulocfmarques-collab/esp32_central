@@ -52,17 +52,20 @@ flowchart LR
 
 ## 📦 What's Inside
 
-```
-Central.ino                  ← Entry point & main loop
-├── Display/                  → Screen rendering & initialization
-├── InterfaceCentral/         → Touch detection & button layout
-├── WifiConfig/               → Network & portal setup
-├── UdpComm/                  → Send/receive UDP packets
-├── CommandHandler/           → Execute commands & OTA
-├── NTPUtil/                  → Time synchronization
-└── Botao/                    → UI constants & button definitions
-```
+```mermaid
+graph TD
+    Central[Central.ino <br><i>Entry point & main loop</i>]
+    
+    Central --> Display[Display/<br><i>Screen rendering & initialization</i>]
+    Central --> InterfaceCentral[InterfaceCentral/<br><i>Touch detection & button layout</i>]
+    Central --> WifiConfig[WifiConfig/<br><i>Network & portal setup</i>]
+    Central --> UdpComm[UdpComm/<br><i>Send/receive UDP packets</i>]
+    Central --> CommandHandler[CommandHandler/<br><i>Execute commands & OTA</i>]
+    Central --> NTPUtil[NTPUtil/<br><i>Time synchronization</i>]
+    Central --> Botao[Botao/<br><i>UI constants & button definitions</i>]
 
+    style Central fill:#f9f,stroke:#333,stroke-width:2px
+```
 ---
 
 ## 🛠️ Hardware Setup
@@ -78,26 +81,35 @@ Central.ino                  ← Entry point & main loop
 | **Power Supply** | USB or 5V adapter |
 | **Wi‑Fi Router** | Local network only |
 
-### Wiring (5 minutes)
+### Wiring
 
-```
-┌─────────────────────────────┐
-│         ESP32               │
-│                             │
-│  GPIO 25 ────→ Touch CLK    │
-│  GPIO 39 ────→ Touch MISO   │
-│  GPIO 32 ────→ Touch MOSI   │
-│  GPIO 33 ────→ Touch CS     │
-│  GPIO 4  ────→ Status LED   │
-│  GPIO 21 ────→ Aux Output   │
-└─────────────────────────────┘
-        │
-    Wi‑Fi Network
-        │
-    ┌───┴───────────────────┐
-    │                       │
-  Slave 1          Slave 2
-192.168.0.120    192.168.0.125
+```mermaid
+graph TB
+    subgraph ESP32 [ESP32 Master]
+        direction TB
+        p25[GPIO 25] -->|Touch CLK| TCLK[Touch CLK]
+        p39[GPIO 39] -->|Touch MISO| TMISO[Touch MISO]
+        p32[GPIO 32] -->|Touch MOSI| TMOSI[Touch MOSI]
+        p33[GPIO 33] -->|Touch CS| TCS[Touch CS]
+        p4[GPIO 4] -->|Status LED| LED[Status LED]
+        p21[GPIO 21] -->|Aux Output| AUX[Aux Output]
+    end
+
+    ESP32 -->|Wi-Fi Network| Network((Wi-Fi Network))
+
+    subgraph Slaves [Slave Devices]
+        S1[Slave 1<br><b>192.168.0.120</b>]
+        S2[Slave 2<br><b>192.168.0.125</b>]
+    end
+
+    Network --> S1
+    Network --> S2
+
+    %% Estilização para ficar limpo e moderno
+    classDef hardware fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef network fill:#e1f5fe,stroke:#0288d1,stroke-width:1px;
+    class ESP32,Slaves hardware;
+    class Network network;
 ```
 
 > **Tip**: Double-check your display's pinout before soldering. The touch pins are fixed, but the TFT data pins may vary by module.

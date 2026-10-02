@@ -39,8 +39,6 @@ bool UdpComm::escutarResposta(String& msgOut, bool& veioDeEscravoOut) {
       String ipRemoto = _udp.remoteIP().toString();
       if (ipRemoto == _ipEscravo1 || ipRemoto == _ipEscravo2) {
         veioDeEscravoOut = true;
-        // Não resetamos _aguardandoResposta para falso aqui se for uma resposta múltipla (SD)
-        // Deixamos o fluxo principal gerenciar se o arquivo terminou ou não.
       } else {
         veioDeEscravoOut = false; 
       }

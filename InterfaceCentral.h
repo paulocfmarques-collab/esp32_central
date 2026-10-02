@@ -29,8 +29,7 @@ private:
   String _mensagemResposta;
   const unsigned long AUTO_CLOSE_MS = 7000; 
 
-  // CORRIGIDO: Total real e absoluto de inicializadores na lista
-  static const int TOTAL_BOTOES = 24; 
+  static const int TOTAL_BOTOES = 36; 
   Botao _botoesAcao[TOTAL_BOTOES];
   
   const int btnLocalX = 20,  btnLocalY = 110, btnLocalW = 130, btnLocalH = 60;
@@ -40,7 +39,8 @@ private:
   const int sel2X = 170, sel2Y = 48, sel2W = 135, sel2H = 35;
   const int btnProxX = 15, btnProxY = 185, btnProxW = 290, btnProxH = 32;
 
-  int obterTotalPaginasDoModo() const;
+  // CORRIGIDO: Nome alterado para português (obter)
+  int obterTotalPaginasDoModo() const; 
 
 public:
   InterfaceCentral(Display& displayRef);
@@ -55,8 +55,7 @@ public:
   void imprimirRodape(String msg, uint16_t cor);
   const char* escanearToque();
   int obterModoOperacao() const { return _modoOperacao; }
-  void desligarDisplayFisico();
-
+  void desligarDisplayFisico(); 
 };
 
 #endif

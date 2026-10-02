@@ -22,8 +22,10 @@ extern InterfaceCentral central;
 extern UdpComm udp;
 extern NTPUtil ntp;
 
-// Configuração do LED local físico fixado no pino 4
 #define LED_PINOBLE 4
+
+static String _mestreUltimoCmd = "Nenhum";
+static uint32_t _mestreTotalCmd = 0;
 
 class OtaManager {
 public:
@@ -40,8 +42,8 @@ public:
         ArduinoOTA.onProgress([&IC](unsigned int progresso, unsigned int total) {
             int porcentagem = progresso / (total / 100);
             String barra = "Progresso: " + String(porcentagem) + "%\n[";
-            int blocos = porcentagem / 5;
-            for(int i = 0; i < 20; i++) barra += (i < blocos) ? "=" : " ";
+            int blocks = porcentagem / 5;
+            for(int i = 0; i < 20; i++) barra += (i < blocks) ? "=" : " ";
             barra += "]";
             IC.exibirTelaResposta("ATUALIZANDO OTA\n" + barra);
         });
@@ -65,7 +67,7 @@ private:
 public:
     static void inicializarHardware() {
         pinMode(LED_PINOBLE, OUTPUT);
-        digitalWrite(LED_PINOBLE, HIGH); // LED apagado inicialmente (Lógica Invertida do ESP32)
+        digitalWrite(LED_PINOBLE, HIGH); 
     }
 
     static void gerenciarBlinkAsync() {
@@ -80,12 +82,59 @@ public:
     }
 
     static void executar(const String& cmd, bool requisicaoRemotaUdp = false) {
+        if (cmd != "LASTCMD" && cmd != "CMDCOUNT") {
+            _mestreUltimoCmd = cmd;
+            _mestreTotalCmd++;
+        }
+
         Serial.print(F("Comando Mestre processando: "));
         Serial.println(cmd);
         String resp = "";
 
-        // ─── CONFIGURAÇÃO DE ESCRAVOS ───
-        if (cmd.startsWith("SET_ESCRAVO1:")) {
+        if (cmd == "INFO") {
+            String dataHoraCompleta; ntp.getDateTime(dataHoraCompleta, 100);
+            String dataStr = "Sem Sinc.", horaStr = "--:--:--";
+            if (dataHoraCompleta.length() >= 19) {
+                dataStr = dataHoraCompleta.substring(0, 10);
+                horaStr = dataHoraCompleta.substring(11, 19);
+            }
+            uint32_t heapLivre = ESP.getFreeHeap() / 1024;
+            float flashLivre = (float)ESP.getFreeSketchSpace() / (1024.0 * 1024.0);
+
+            resp = "===== DEVICE INFO =====\n"
+                "Hostname: ESP32_MESTRE\n"
+                "Firmware: 1.0.0_MSTR\n"
+                "Build: " + String(__DATE__) + " " + String(__TIME__) + "\n" +
+                "SSID: " + WiFi.SSID() + "\n" +
+                "IP: " + WiFi.localIP().toString() + "\n" +
+                "MAC: " + WiFi.macAddress() + "\n" +
+                "RSSI: " + String(WiFi.RSSI()) + " dBm\n" +
+                "Heap Livre: " + String(heapLivre) + " KB\n" +
+                "Flash Livre: " + String(flashLivre, 1) + " MB\n" +
+                "SD Card: N/A\n" + 
+                "Data: " + dataStr + "\n" +
+                "Hora: " + horaStr + "\n" +
+                "Uptime: " + String(millis()) + " ms\n" +
+                "=======================";
+        }
+        else if (cmd == "VERSION") {
+            resp = "Central Mestre:\nVersao Firmware: v1.0.0";
+        }
+        else if (cmd == "BUILD") {
+            resp = "Central Mestre Build:\nData: " + String(__DATE__) + "\nHora: " + String(__TIME__);
+        }
+        else if (cmd == "STATUS") {
+            String statusWifi = (WiFi.status() == WL_CONNECTED) ? "OK" : "FALHA";
+            uint32_t heapKB = ESP.getFreeHeap() / 1024;
+            resp = "ONLINE (MESTRE)\nWiFi: " + statusWifi + "\nSD: N/A\nNTP: OK\nHeap: " + String(heapKB) + " KB";
+        }
+        else if (cmd == "LASTCMD") {
+            resp = "Mestre Ultimo Cmd:\n" + _mestreUltimoCmd;
+        }
+        else if (cmd == "CMDCOUNT") {
+            resp = "Mestre Cmd Count:\nTotal: " + String(_mestreTotalCmd) + " processados";
+        }
+        else if (cmd.startsWith("SET_ESCRAVO1:")) {
             String novoIp = cmd.substring(13); novoIp.trim();
             udp.atualizarIpEscravo(1, novoIp);
             resp = "Escravo 1 IP:\n" + novoIp;
@@ -102,16 +151,21 @@ public:
              Preferences prefs; prefs.begin("wifi", false); prefs.clear(); prefs.end();
              delay(2000); ESP.restart();
         }
-
-        // ─── ATUAÇÃO NO HARDWARE LOCAL FÍSICO (Mestre) ───
+        else if (cmd == "DESLIGAR") {
+            central.exibirTelaResposta("Desligando Sistema...\nEntrando em modo de economia.");
+            delay(2000);
+            central.desligarDisplayFisico();
+            esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0); 
+            esp_deep_sleep_start();
+        }
         else if (cmd == "LED_ON") {
             _blinkAtivo = false; _estadoLed = true;
-            digitalWrite(LED_PINOBLE, LOW); // Liga o LED
+            digitalWrite(LED_PINOBLE, LOW); 
             resp = "Central Local:\nLED ligado com sucesso.";
         }
         else if (cmd == "LED_OFF") {
             _blinkAtivo = false; _estadoLed = false;
-            digitalWrite(LED_PINOBLE, HIGH); // Desliga o LED
+            digitalWrite(LED_PINOBLE, HIGH); 
             resp = "Central Local:\nLED desligado.";
         }
         else if (cmd.startsWith("LED_BLINK:")) {
@@ -120,8 +174,6 @@ public:
             _blinkAtivo = true;
             resp = "Central Local:\nBlink ativo (" + String(_intervaloBlink) + " ms)";
         }
-
-        // ─── COMANDOS DE RELÓGIO / NTP ───
         else if (cmd.startsWith("SET_FUSO:")) {
             int novoFuso = cmd.substring(9).toInt();
             if (novoFuso >= -12 && novoFuso <= 14) {
@@ -132,15 +184,13 @@ public:
             }
         }
         else if (cmd == "TIME") {
-            resp = "Hora Mestre:\n" + ntp.getSomenteHora();
+            resp = "Hora:\n" + ntp.getSomenteHora();
         }
         else if (cmd == "DATE") {
             String dataHoraCompleta; ntp.getDateTime(dataHoraCompleta, 100);
             String data = (dataHoraCompleta.length() >= 10) ? dataHoraCompleta.substring(0, 10) : "Erro NTP";
-            resp = "Data Mestre:\n" + data;
+            resp = "Data:\n" + data;
         }
-        
-        // ─── DIAGNÓSTICOS DE HARDWARE INTERNOS ───
         else if (cmd == "CPU") {
             resp = "Central Local CPU:\nModelo: " + String(ESP.getChipModel()) + "\n" +
                    "Cores: " + String(ESP.getChipCores()) + "\n" +
@@ -161,44 +211,20 @@ public:
             resp = "Central Local:\nMAC: " + WiFi.macAddress();
         }
         else if (cmd == "NET_INFO") {
-            resp = "Central Local NET:\nIP: " + WiFi.localIP().toString() + "\n" +
-                   "RSSI: " + String(WiFi.RSSI()) + " dBm\n" +
-                   "SSID: " + WiFi.SSID();
+            resp = "Central Local NET:\nIP: " + WiFi.localIP().toString() + "\nRSSI: " + String(WiFi.RSSI()) + " dBm\nSSID: " + WiFi.SSID();
         }
         else if (cmd == "UPTIME") {
-            resp = "Uptime Mestre:\n" + String(millis() / 1000) + " s";
-        }
-        else if (cmd == "DESLIGAR") {
-            central.exibirTelaResposta("Desligando Sistema...\nEntrando em modo de economia.");
-            delay(2000);
-            
-            // CORRIGIDO: Chama a função POO encapsulada diretamente na central
-            central.desligarDisplayFisico();
-            
-            // Configura o pino GPIO 0 (Botão de Boot do ESP32) para acordar a placa no GND
-            esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0); 
-            
-            // Dorme profundamente (Consumo cai para microamperes)
-            esp_deep_sleep_start();
+            resp = "Uptime:\n" + String(millis() / 1000) + " s";
         }
         else {
             resp = "Central Local:\nComando desconhecido.";
         }
 
-        // Fixa os resultados de forma visual no LCD
         central.exibirTelaResposta(resp);
-
-        // Se o comando veio pela rede, devolve o feedback textual para o emissor externo
         if (requisicaoRemotaUdp) {
             udp.responderRemoto(resp);
         }
     }
 };
-
-// Alocação estática das variáveis de controle do Blink
-bool CommandHandler::_blinkAtivo = false;
-bool CommandHandler::_estadoLed = false;
-unsigned long CommandHandler::_ultimoToggle = 0;
-unsigned long CommandHandler::_intervaloBlink = 500;
 
 #endif

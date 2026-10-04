@@ -125,100 +125,62 @@ graph LR
 
 ### 🔹 Comandos locais (executados no central)
 
-<details open>
-<summary><b>Clique para expandir/recolher</b></summary>
-
-#### Diagnostics de Sistema
-
-| Comando | Resultado |
-| :--- | :--- |
-| `help` | Lista todos os comandos e sintaxe |
-| `info` | Status completo do dispositivo |
-| `status` | Resumo rápido (rede, heap, NTP) |
-| `reason` | Motivo do último reset |
-| `version` | Versão do firmware |
-| `build` | Data e hora da compilação |
-
-#### Monitoramento de Hardware
-
-| Comando | Resultado |
-| :--- | :--- |
-| `cpu` | Modelo, núcleos e frequência |
-| `ram` | Heap total e heap livre |
-| `flash` | Tamanho e velocidade da memória |
-| `temp` | Temperatura interna da CPU (°C) |
-| `uptime` | Tempo de atividade em segundos |
-
-#### Rede e Conectividade
-
-| Comando | Resultado |
-| :--- | :--- |
-| `mac` | Endereço MAC do Wi‑Fi |
-| `net_info` | IP local, RSSI e SSID |
-| `time` | Hora atual sincronizada |
-| `date` | Data atual sincronizada |
-
-#### Controle de LED
-
-| Comando | Resultado |
-| :--- | :--- |
-| `led_on` | Liga o LED de status |
-| `led_off` | Desliga o LED |
-| `led_blink:500` | Pisca com intervalo em ms (ex: 500) |
-
-#### Configuração e Administração
-
-| Comando | Sintaxe | Resultado |
-| :--- | :--- | :--- |
-| `set_escravo1` | `set_escravo1:192.168.0.10` | Configura IP do escravo 1 |
-| `set_escravo2` | `set_escravo2:192.168.0.11` | Configura IP do escravo 2 |
-| `set_escravo3` | `set_escravo3:192.168.0.12` | Configura IP do escravo 3 |
-| `set_escravo4` | `set_escravo4:192.168.0.13` | Configura IP do escravo 4 |
-| `set_fuso` | `set_fuso:-3` | Altera timezone NTP (GMT-3, GMT-5, etc) |
-| `scan` | `scan` | Varredura de escravos (online/offline) |
-| `reset_wifi` | `reset_wifi` | Limpa flash e abre portal de configuração |
-| `reset` | `reset` | Reinicia o ESP32 |
-| `desligar` | `desligar` | Deep sleep com display desligado |
-
-#### Comandos Internos
-
-| Comando | Resultado |
-| :--- | :--- |
-| `lastcmd` | Mostra o último comando processado |
-| `cmdcount` | Contagem total de comandos |
-| `vago` | Placeholder para comando não utilizado |
-
-</details>
+| Categoria | Comando | Sintaxe | Resultado |
+| :--- | :--- | :--- | :--- |
+| **Diagnostics** | `help` | `help` | Lista todos os comandos e sintaxe |
+| **Diagnostics** | `info` | `info` | Status completo do dispositivo |
+| **Diagnostics** | `status` | `status` | Resumo rápido (rede, heap, NTP) |
+| **Diagnostics** | `reason` | `reason` | Motivo do último reset |
+| **Diagnostics** | `version` | `version` | Versão do firmware |
+| **Diagnostics** | `build` | `build` | Data e hora da compilação |
+| **Hardware** | `cpu` | `cpu` | Modelo, núcleos e frequência |
+| **Hardware** | `ram` | `ram` | Heap total e heap livre (KB) |
+| **Hardware** | `flash` | `flash` | Tamanho e velocidade da memória |
+| **Hardware** | `temp` | `temp` | Temperatura interna da CPU (°C) |
+| **Hardware** | `uptime` | `uptime` | Tempo de atividade em segundos |
+| **Rede** | `mac` | `mac` | Endereço MAC do Wi‑Fi |
+| **Rede** | `net_info` | `net_info` | IP local, RSSI e SSID |
+| **Rede** | `time` | `time` | Hora atual sincronizada via NTP |
+| **Rede** | `date` | `date` | Data atual sincronizada via NTP |
+| **LED** | `led_on` | `led_on` | Liga o LED de status (GPIO 4) |
+| **LED** | `led_off` | `led_off` | Desliga o LED |
+| **LED** | `led_blink` | `led_blink:500` | Pisca com intervalo em ms (ex: 500, 800, 1000) |
+| **Config** | `set_escravo1` | `set_escravo1:192.168.0.10` | Configura IP do escravo 1 |
+| **Config** | `set_escravo2` | `set_escravo2:192.168.0.11` | Configura IP do escravo 2 |
+| **Config** | `set_escravo3` | `set_escravo3:192.168.0.12` | Configura IP do escravo 3 |
+| **Config** | `set_escravo4` | `set_escravo4:192.168.0.13` | Configura IP do escravo 4 |
+| **Config** | `set_fuso` | `set_fuso:-3` | Altera timezone NTP (GMT-3, GMT-5, etc) |
+| **Config** | `scan` | `scan` | Varredura de escravos (online/offline) |
+| **Config** | `reset_wifi` | `reset_wifi` | Limpa flash e abre portal de configuração |
+| **Config** | `reset` | `reset` | Reinicia o ESP32 |
+| **Config** | `desligar` | `desligar` | Deep sleep com display desligado |
+| **Interno** | `lastcmd` | `lastcmd` | Mostra o último comando processado |
+| **Interno** | `cmdcount` | `cmdcount` | Contagem total de comandos |
+| **Interno** | `vago` | `vago` | Placeholder para comando não utilizado |
 
 ---
 
 ### 🔵 Comandos remotos (enviados via UDP aos escravos)
 
-<details open>
-<summary><b>Clique para expandir/recolher</b></summary>
+| Comando | Sintaxe | Resultado | Escravos |
+| :--- | :--- | :--- | :--- |
+| `LED_ON` | `LED_ON` | Liga LED no escravo | 1-4 |
+| `LED_OFF` | `LED_OFF` | Desliga LED no escravo | 1-4 |
+| `LED_BLINK` | `LED_BLINK:1000` | Pisca LED com intervalo em ms | 1-4 |
+| `TEMP` | `TEMP` | Temperatura da CPU do escravo | 1-4 |
+| `CPU` | `CPU` | Info de processador | 1-4 |
+| `RAM` | `RAM` | Status de memória | 1-4 |
+| `FLASH` | `FLASH` | Info de armazenamento | 1-4 |
+| `INFO` | `INFO` | Status completo do escravo | 1-4 |
+| `STATUS` | `STATUS` | Resumo rápido | 1-4 |
+| `VERSION` | `VERSION` | Versão do firmware | 1-4 |
+| `UPTIME` | `UPTIME` | Tempo de atividade | 1-4 |
+| `NET_INFO` | `NET_INFO` | IP, RSSI, SSID do escravo | 1-4 |
+| `TIME` | `TIME` | Hora atual sincronizada | 1-4 |
+| `DATE` | `DATE` | Data atual sincronizada | 1-4 |
+| `alive` | `alive` | Ping para detecção (usado em SCAN) | 1-4 |
 
-A central pode disparar os mesmos comandos locais contra qualquer escravo cadastrado:
-
-```
-LED_ON          → Liga LED no escravo
-LED_OFF         → Desliga LED no escravo
-LED_BLINK:1000  → Pisca LED com intervalo em ms
-TEMP            → Temperatura da CPU do escravo
-CPU             → Info de processador
-RAM             → Status de memória
-FLASH           → Info de armazenamento
-INFO            → Status completo
-STATUS          → Resumo rápido
-VERSION         → Versão do firmware
-UPTIME          → Tempo de atividade
-NET_INFO        → IP, RSSI, SSID
-TIME / DATE     → Hora e data
-alive           → Ping para detecção (usado em SCAN)
-```
-
-> **Nota**: O modo REMOTE da interface permite selecionar o alvo (Escravo 1-4) antes de disparar o comando.
-
-</details>
+> **Nota**: O modo REMOTE da interface permite selecionar o alvo (Escravo 1-4) antes de disparar o comando. Todos os comandos remotos são enviados via UDP na porta 4210.
 
 ---
 

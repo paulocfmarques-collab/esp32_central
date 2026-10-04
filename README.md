@@ -261,16 +261,21 @@ Use o comando serial ou o terminal do firmware: `reset_wifi`
 
 ## 📡 Fluxo de comunicação
 
-```text
-Usuário toca botão
-      ↓
-ESP32 Central detecta o toque e o modo
-      ├─ LOCAL → executa comando localmente
-      └─ REMOTE → envia UDP para o escravo selecionado
-      ↓
-Resposta é capturada e exibida na tela
-      ↓
-Auto-fechamento em 7s ou toque para voltar
+```mermaid
+flowchart TD
+    A[User touches button]
+    B[ESP32 Central detects touch and current mode]
+    C[LOCAL<br/>Execute command locally]
+    D[REMOTE<br/>Send UDP command to selected slave]
+    E[Response captured and displayed on screen]
+    F[Auto-close after 7 seconds or touch to return]
+
+    A --> B
+    B --> C
+    B --> D
+    C --> E
+    D --> E
+    E --> F
 ```
 
 ---
@@ -338,29 +343,42 @@ led_off
 
 ## 📚 Estrutura de arquivos
 
-```text
-esp32_central/
-├── Botao.h
-├── Central.ino
-├── CommandHandler.cpp
-├── CommandHandler.h
-├── Display.cpp
-├── Display.h
-├── InterfaceCentral.cpp
-├── InterfaceCentral.h
-├── LayoutDatabase.cpp
-├── LayoutDatabase.h
-├── NTPUtil.h
-├── README.md
-├── ScreenRenderer.cpp
-├── ScreenRenderer.h
-├── TouchDriver.cpp
-├── TouchDriver.h
-├── UdpComm.cpp
-├── UdpComm.h
-├── WifiConfig.cpp
-├── WifiConfig.h
-└── LICENSE (se presente no fork/clone)
+```mermaid
+graph TD
+    A[ESP32 Central Project]
+
+    A --> B[Core]
+    B --> B1[Central.ino]
+    B --> B2[CommandHandler.cpp]
+    B --> B3[CommandHandler.h]
+
+    A --> C[Display]
+    C --> C1[Display.cpp]
+    C --> C2[Display.h]
+    C --> C3[ScreenRenderer.cpp]
+    C --> C4[ScreenRenderer.h]
+
+    A --> D[Touch Interface]
+    D --> D1[TouchDriver.cpp]
+    D --> D2[TouchDriver.h]
+    D --> D3[Botao.h]
+
+    A --> E[Communication]
+    E --> E1[UdpComm.cpp]
+    E --> E2[UdpComm.h]
+    E --> E3[WifiConfig.cpp]
+    E --> E4[WifiConfig.h]
+    E --> E5[NTPUtil.h]
+
+    A --> F[User Interface]
+    F --> F1[InterfaceCentral.cpp]
+    F --> F2[InterfaceCentral.h]
+    F --> F3[LayoutDatabase.cpp]
+    F --> F4[LayoutDatabase.h]
+
+    A --> G[Documentation]
+    G --> G1[README.md]
+    G --> G2[LICENSE]
 ```
 
 > A lista acima reflete os arquivos atualmente presentes no repositório. O módulo `TFT_eSPI/User_Setup.h` é de configuração local da biblioteca externa e não é versionado aqui.

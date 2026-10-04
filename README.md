@@ -6,132 +6,117 @@
 ![Language](https://img.shields.io/badge/Language-C%2B%2B-00599C?style=for-the-badge&logo=c%2B%2B)
 ![Connectivity](https://img.shields.io/badge/Connectivity-Wi--Fi-00A3FF?style=for-the-badge)
 ![Protocol](https://img.shields.io/badge/Protocol-UDP-4CAF50?style=for-the-badge)
+![Display](https://img.shields.io/badge/Display-TFT%20Touch-9C27B0?style=for-the-badge)
 
 </div>
 
-> **A full-featured touchscreen control hub for ESP32 automation projects.** Monitor and command multiple remote nodes, execute local diagnostics, manage Wi‑Fi on the fly, and sync your system clock—all from one compact device with a beautiful 3.2" display.
+> Central de automação, monitoramento e comando para ESP32 com interface touchscreen, operação local/remota e integração com dispositivos esclavos em LAN.
 
----
+## Visão geral
 
-## ✨ What You Get
+O projeto `ESP32 Central` funciona como uma central de controle para um ecossistema de ESP32s espalhados em rede local. A unidade principal oferece:
 
-- **Dual-mode interface**: Switch between local commands (self-diagnostics) and remote control (send UDP commands to slave devices)
-- **Dual-target support**: Seamlessly toggle between two ESP32 slaves on your network
-- **Live response display**: See results instantly on the touchscreen with auto-scrolling output
-- **Web configuration portal**: First-time setup or credential reset through a simple web form at `192.168.4.1`
-- **Real-time clock**: Built-in NTP sync to keep your ESP32 timestamp-perfect
-- **OTA updates**: Deploy new firmware wirelessly without plugging in a USB cable
-- **Persistent settings**: Automatic save of Wi‑Fi credentials and device IPs to flash memory
-- **Rich command set**: Temperature, memory, network info, uptime, LED control, and more
+- interface gráfica em TFT touchscreen de 320x240;
+- seleção de modo local ou remoto;
+- envio de comandos via UDP para até 4 dispositivos esclavos;
+- diagnósticos locais do próprio ESP32;
+- portal Wi‑Fi para configuração inicial e recuperação de credenciais;
+- sincronização de relógio via NTP;
+- atualização OTA por rede;
+- persistência de configuração em flash via `Preferences`;
+- suporte a resposta em tela com scroll e auto-fechamento.
 
----
-
-## 🏗️ How It Works
+## Arquitetura do sistema
 
 ```mermaid
 flowchart LR
-    User["👤 You"] --> Touch["📱 Tap the Screen"]
-    Touch --> Central["🎛️ ESP32 Central"]
-    Central --> WiFi["📶 Wi‑Fi Network"]
-    WiFi --> Node1["🖥️ Slave 1<br/>192.168.0.120"]
-    WiFi --> Node2["🖥️ Slave 2<br/>192.168.0.125"]
-    Node1 --> Central
-    Node2 --> Central
-    Central --> Display["💬 See Response"]
+    A[Usuário] --> B[Display TFT + Touch]
+    B --> C[ESP32 Central]
+    C --> D[Wi‑Fi / LAN]
+    D --> E[Escravo 1]
+    D --> F[Escravo 2]
+    D --> G[Escravo 3]
+    D --> H[Escravo 4]
+    E --> C
+    F --> C
+    G --> C
+    H --> C
+    C --> I[Monitor de respostas / logs / comandos]
 ```
 
-### The Flow
+## Funcionalidades principais
 
-1. **You tap a button** on the 320×240 TFT touchscreen
-2. **The central decides**: run the command locally or send it over UDP?
-3. **Command goes out**: UDP packet lands on the target ESP32
-4. **Response comes back**: Text answer is parsed and displayed
-5. **Auto-reset**: After 7 seconds or another tap, return to the menu
+### 1. Controle local e remoto
+- Modo local: executa comandos diretamente na central.
+- Modo remoto: envia comandos UDP para um alvo específico em rede.
+- Suporte a múltiplos escravos com status visual de disponibilidade.
 
----
+### 2. Interface touchscreen
+- Menu principal em tela gráfica.
+- Botões de navegação, páginas e seleção de escravo.
+- Exibição de resposta com atualização e auto-scroll.
 
-## 📦 What's Inside
+### 3. Configuração inteligente
+- Portal web em `192.168.4.1` para conexão inicial ao Wi‑Fi.
+- Salvamento automático de SSID, senha e IPs dos escravos.
+- Reset rápido de conexão com comando `RESET_WIFI`.
 
-```mermaid
-graph TD
-    Central[Central.ino <br><i>Entry point & main loop</i>]
-    
-    Central --> Display[Display/<br><i>Screen rendering & initialization</i>]
-    Central --> InterfaceCentral[InterfaceCentral/<br><i>Touch detection & button layout</i>]
-    Central --> WifiConfig[WifiConfig/<br><i>Network & portal setup</i>]
-    Central --> UdpComm[UdpComm/<br><i>Send/receive UDP packets</i>]
-    Central --> CommandHandler[CommandHandler/<br><i>Execute commands & OTA</i>]
-    Central --> NTPUtil[NTPUtil/<br><i>Time synchronization</i>]
-    Central --> Botao[Botao/<br><i>UI constants & button definitions</i>]
+### 4. Monitoramento e diagnóstico
+- `INFO`, `STATUS`, `TEMP`, `RAM`, `FLASH`, `NET_INFO`, `UPTIME`, `TIME`, `DATE`, `CPU`, `MAC`, `REASON` e outros comandos.
+- Checagem de saúde da rede e do sistema.
+- Indicador de conexão Wi‑Fi e sincronização NTP.
 
-    style Central fill:#f9f,stroke:#333,stroke-width:2px
-```
----
+### 5. Atualização OTA
+- Suporte a atualização remota via ArduinoOTA.
+- Tela de progresso exibida durante a gravação.
+- Proteção do watchdog e da aplicação durante a atualização.
 
-## 🛠️ Hardware Setup
+## Estrutura dos arquivos
 
-### You'll Need
+- `Central.ino` — ponto de entrada e loop principal
+- `Display.h/.cpp` — abstração do TFT e mensagens de tela
+- `InterfaceCentral.h/.cpp` — navegação e renderização de layout
+- `UdpComm.h/.cpp` — comunicação UDP com timeout e cache de IPs
+- `WifiConfig.h/.cpp` — portal de configuração e conexão Wi‑Fi
+- `CommandHandler.h` — parser de comandos, LED, OTA e comandos locais
+- `LayoutDatabase.h/.cpp` — definições visuais e dados dos botões
+- `NTPUtil.h` — sincronização de horário
+- `TouchDriver.h/.cpp` — entrada táctil
+- `ScreenRenderer.h/.cpp` — desenho e renderização da interface
+- `Botao.h` — estrutura dos botões
 
-| Component | Notes |
+## Hardware recomendado
+
+| Componente | Recomendação |
 | --- | --- |
-| **ESP32 Dev Board** | Any variant—32 works great |
-| **2.8" TFT Display (SPI)** | 320×240 resolution |
-| **XPT2046 Touch Controller** | Resistive touch panel |
-| **LED** | On GPIO 4 for status feedback |
-| **Power Supply** | USB or 5V adapter |
-| **Wi‑Fi Router** | Local network only |
+| ESP32 | qualquer modelo principal com Wi‑Fi |
+| Display | TFT 320x240 SPI |
+| Touch | controlador XPT2046 |
+| LED | GPIO 4 para feedback visual |
+| Alimentação | 5V estável |
+| Rede | Wi‑Fi local da mesma LAN |
 
-### Wiring
+## Configuração rápida
 
-```mermaid
-graph TB
-    subgraph ESP32 [ESP32 Master]
-        direction TB
-        p25[GPIO 25] -->|Touch CLK| TCLK[Touch CLK]
-        p39[GPIO 39] -->|Touch MISO| TMISO[Touch MISO]
-        p32[GPIO 32] -->|Touch MOSI| TMOSI[Touch MOSI]
-        p33[GPIO 33] -->|Touch CS| TCS[Touch CS]
-        p4[GPIO 4] -->|Status LED| LED[Status LED]
-        p21[GPIO 21] -->|Aux Output| AUX[Aux Output]
-    end
+### 1. Clone o repositório
 
-    ESP32 -->|Wi-Fi Network| Network((Wi-Fi Network))
-
-    subgraph Slaves [Slave Devices]
-        S1[Slave 1<br><b>192.168.0.120</b>]
-        S2[Slave 2<br><b>192.168.0.125</b>]
-    end
-
-    Network --> S1
-    Network --> S2
-
-    %% Estilização para ficar limpo e moderno
-    classDef hardware fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef network fill:#e1f5fe,stroke:#0288d1,stroke-width:1px;
-    class ESP32,Slaves hardware;
-    class Network network;
-```
-
-> **Tip**: Double-check your display's pinout before soldering. The touch pins are fixed, but the TFT data pins may vary by module.
-
----
-
-## 🚀 Getting Started
-
-### 1. Grab the Code
 ```bash
 git clone https://github.com/paulocfmarques-collab/esp32_central.git
 cd esp32_central
 ```
 
-### 2. Install Dependencies in Arduino IDE
-- Go to **Sketch → Include Library → Manage Libraries**
-- Search and install:
-  - `TFT_eSPI`
-  - `XPT2046_Touchscreen`
+### 2. Instale as bibliotecas
 
-### 3. Configure Your Display
-Edit `TFT_eSPI/User_Setup.h` to match your screen pinout. Example:
+No Arduino IDE ou PlatformIO, instale as bibliotecas necessárias, principalmente:
+
+- `TFT_eSPI`
+- `Preferences` (já integrada ao Arduino Core)
+- `WiFi` e `WebServer` (providas pelo ESP32 core)
+
+### 3. Configure o display
+
+Ajuste o `User_Setup.h` do `TFT_eSPI` para a pinagem do seu módulo. Exemplo:
+
 ```cpp
 #define TFT_MOSI 23
 #define TFT_MISO 19
@@ -140,147 +125,112 @@ Edit `TFT_eSPI/User_Setup.h` to match your screen pinout. Example:
 #define TFT_DC   2
 ```
 
-### 4. Upload & Enjoy
-- Select **ESP32 Dev Module** from the board menu
-- Hit **Upload**
-- Open the serial monitor (115200 baud) to watch it boot
+### 4. Carregue o firmware
 
----
+- selecione a placa `ESP32 Dev Module`;
+- escolha a porta serial correta;
+- faça o upload do projeto;
+- observe a serial em `115200`.
 
-## 💬 Command Palette
+### 5. Primeiro uso
 
-### Local Commands (Run on Central)
+Se não houver credencial Wi‑Fi salva, o ESP32 entra em modo de configuração e abre um ponto de acesso para configuração via navegador em `192.168.4.1`.
 
-Perfect for monitoring your central's health—CPU temp, free memory, network signal strength, firmware version, uptime, and more.
+## Comandos suportados
 
-| Command | Result |
+### Comandos locais
+
+| Comando | Descrição |
 | --- | --- |
-| `INFO` | Full device summary |
-| `TEMP` | CPU temperature |
-| `CPU` | Processor specs |
-| `RAM` | Memory snapshot |
-| `FLASH` | Storage info |
-| `UPTIME` | How long it's been running |
-| `MAC` | Network address |
-| `NET_INFO` | IP, RSSI, SSID |
-| `LED_ON` / `LED_OFF` | Toggle local LED |
-| `LED_BLINK:500` | Pulse at interval (ms) |
-| `STATUS` | System health check |
-| `TIME` / `DATE` | Clock info |
-| `VERSION` / `BUILD` | Firmware details |
+| `HELP` | mostra lista de comandos |
+| `INFO` | status completo do dispositivo |
+| `STATUS` | resumo rápido |
+| `REASON` | motivo do último reset |
+| `VERSION` | firmware |
+| `BUILD` | data e hora da compilação |
+| `CPU` | modelo, núcleos e frequência |
+| `RAM` | heap total e livre |
+| `FLASH` | memória flash |
+| `TEMP` | temperatura interna |
+| `MAC` | endereço MAC |
+| `NET_INFO` | IP, RSSI e SSID |
+| `UPTIME` | tempo de atividade |
+| `TIME` / `DATE` | hora e data |
+| `LED_ON` / `LED_OFF` | controle do LED |
+| `LED_BLINK:500` | pisca com intervalo configurável |
+| `SET_FUSO:-3` | ajuste de timezone |
+| `RESET_WIFI` | limpa configuração Wi‑Fi |
+| `SCAN` | varredura dos escravos |
+| `RESET` | reinicia o ESP32 |
 
-### Remote Commands (Send to Slaves)
+### Comandos remotos
 
-Trigger these on any remote node from your touchscreen. Same command set, dispatched over UDP.
+A central também pode disparar comandos para folhas/ESP32s remotos via UDP, como:
 
-- `LED_ON`, `LED_OFF`, `LED_BLINK:1000`
-- `TEMP`, `CPU`, `RAM`
-- `INFO`, `STATUS`, `VERSION`
-- `UPTIME`, `NET_INFO`
-- ...and more
+- `LED_ON`
+- `LED_OFF`
+- `LED_BLINK:1000`
+- `TEMP`
+- `CPU`
+- `RAM`
+- `INFO`
+- `STATUS`
+- `VERSION`
+- `UPTIME`
+- `NET_INFO`
 
----
+## Fluxo de operação
 
-## 🌐 First-Time Setup
-
-**No saved Wi‑Fi yet?** The ESP32 will boot into **configuration mode**.
-
-1. Look for the access point `ESP32_CENTRAL_CONFIG` on your phone/laptop
-2. Connect to it (no password needed)
-3. Open a browser to `192.168.4.1`
-4. Fill in your network SSID, password, and the IPs of your two slave devices
-5. **Save** → ESP32 reboots and connects automatically
-
-After that, credentials are saved to flash. Change them anytime by sending a `RESET_WIFI` command.
-
----
-
-## 🎮 Using the Interface
-
-### Mode Selection
-- **LOCAL**: Run diagnostics and tests on the central itself
-- **REMOTE**: Pick a slave device and fire commands at it
-
-### Navigation
-- **Page buttons**: Flip through 3 pages of commands per mode
-- **Slave selector** (remote mode): Tap `ESP 1` or `ESP 2` to switch targets
-- **Touch anywhere on response**: Return to the main menu instantly
-
-### Response Screen
-- Answers scroll naturally if they're long
-- Auto-returns to menu after 7 seconds
-- All output is green text on black for readability
-
----
-
-## 🔧 Advanced Features
-
-### Network Time Protocol (NTP)
-The central syncs with public NTP servers on boot. Timezone is set to GMT-3 by default but adjustable:
-```
-SET_FUSO:-5    ← Change to Eastern Time
+```mermaid
+sequenceDiagram
+    participant User as Usuário
+    participant Central as ESP32 Central
+    participant Slave as Escravo
+    User->>Central: Toca botão no display
+    Central->>Central: Decide: local ou remoto
+    alt Modo local
+        Central->>Central: Executa comando local
+    else Modo remoto
+        Central->>Slave: Envia comando via UDP
+        Slave-->>Central: Resposta em texto
+    end
+    Central->>User: Exibe resposta na tela
 ```
 
-### OTA Updates
-Deploy new firmware over Wi‑Fi without touching a USB cable. The system announces OTA progress on screen.
+## Segurança
 
-### Persistent Configuration
-- Wi‑Fi SSID & password saved to flash
-- Both slave device IPs stored automatically
-- Can be reset at any time via the `RESET_WIFI` command
+Este projeto foi pensado para uso em redes locais confiáveis:
 
-### Async LED Blink
-LED blink runs independently in the main loop without blocking other operations.
+- comunicação UDP sem criptografia;
+- portal de configuração sem proteção por senha por padrão;
+- não recomendado em redes públicas ou internet aberta;
+- evite armazenar credenciais reais em repositórios públicos.
 
----
+## Roadmap
 
-## 🐛 Stuck? Try These
+- otimização da interface para telas maiores ou menores;
+- suporte a mais tipos de dispositivos esclavos;
+- notificações de eventos e logs persistentes;
+- dashboard de status em web local;
+- melhorias em robustez da rede e recuperação automática.
 
-| Problem | Solution |
-| --- | --- |
-| Screen is black | Check TFT wiring & `User_Setup.h` config |
-| Touch not working | Verify XPT2046 pin assignments; test pressure filtering |
-| Wi‑Fi won't connect | Use fallback portal `ESP32_CENTRAL_CONFIG`; verify SSID/password |
-| UDP commands fail | Confirm both devices on same LAN; check firewall rules |
-| NTP not syncing | Ensure internet access before attempting sync |
+## Licença
 
-**Still stuck?** Open an [issue](https://github.com/paulocfmarques-collab/esp32_central/issues)—we're here to help.
+Este projeto está licenciado sob a [MIT License](./LICENSE).
 
----
+## Autor
 
-## 🔒 A Word on Security
+Paulo Marques  
+GitHub: [@paulocfmarques-collab](https://github.com/paulocfmarques-collab)
 
-This project is designed for **trusted local networks only**:
-- UDP communication is unencrypted and unauthenticated
-- The configuration portal has no password protection
-- Never expose the device to the internet or untrusted networks
-- Don't commit real Wi‑Fi passwords to version control
+## Contribuição
 
-Use it in a home lab, maker space, or office LAN where you control who's on the network.
-
----
-
-## 📄 License
-
-MIT License — see [`LICENSE`](./LICENSE) for full details.
-
----
-
-## 👤 Credits
-
-**Paulo Marques**  
-[GitHub @paulocfmarques-collab](https://github.com/paulocfmarques-collab)
-
----
-
-## 🤝 Contributing
-
-Found a bug? Have an idea? [Open an issue](https://github.com/paulocfmarques-collab/esp32_central/issues) or submit a pull request. Community feedback makes this project better.
+Contribuições são bem-vindas. Abra uma issue ou envie um pull request para melhorar o projeto.
 
 ---
 
 <div align="center">
 
-**Made with ❤️ for the ESP32 community**
+Made with ❤️ for the ESP32 community
 
 </div>

@@ -178,7 +178,11 @@ const char* InterfaceCentral::escanearToque() {
                 
                 if (strcmp(LayoutDatabase::botoesAcao[i].comando, "vago") == 0) return nullptr;
 
-                udp.resetarEspera(); 
+                udp.resetarEspera();
+
+                _mensagemRespostaCompleta = ""; 
+                _scrollOffsetLinhas = 0;
+
 
                 Serial.print(F("[Touch] Comando validado e disparado: "));
                 Serial.println(LayoutDatabase::botoesAcao[i].comando);
@@ -194,7 +198,8 @@ void InterfaceCentral::exibirTelaResposta(String msg) {
     _modoRespostaAtivo = true; 
     _tempoAberturaRespostaTS = millis();
     _scrollOffsetLinhas = 0;
-    _mensagemRespostaCompleta = msg; // Guarda o texto integral
+    
+    _mensagemRespostaCompleta = msg; 
     
     if (mutexSPI != NULL && xSemaphoreTake(mutexSPI, pdMS_TO_TICKS(10)) == pdTRUE) {
         _renderer.desenharTelaResposta(msg, _yTerminalDinamic);
@@ -203,10 +208,16 @@ void InterfaceCentral::exibirTelaResposta(String msg) {
 }
 
 void InterfaceCentral::acumularMensagemResposta(String msg) {
-    _mensagemRespostaCompleta += "\n" + msg; // Acumula no histórico completo
     _tempoAberturaRespostaTS = millis();
     
-    if (!_modoRespostaAtivo) { exibirTelaResposta(_mensagemRespostaCompleta); return; }
+    // Se a tela de resposta não estava aberta, inicia um buffer totalmente fresco
+    if (!_modoRespostaAtivo) { 
+        exibirTelaResposta(msg); 
+        return; 
+    }
+    
+    // Se a tela já estava aberta e este é um pacote contínuo do MESMO comando, ele acumula
+    _mensagemRespostaCompleta += "\n" + msg; 
     
     if (mutexSPI != NULL && xSemaphoreTake(mutexSPI, pdMS_TO_TICKS(10)) == pdTRUE) {
         _renderer.renderizarNovaLinhaResposta(msg, _yTerminalDinamic);

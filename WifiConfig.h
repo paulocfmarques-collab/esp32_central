@@ -23,11 +23,15 @@ private:
   String _tempIp3;
   String _tempIp4;
 
+  // Callbacks estáticos para compatibilidade com o servidor Web do ESP32
   static void handleRootCallback();
   static void handleSaveCallback();
+  static void handleInfoApiCallback(); 
 
+  // Métodos internos de processamento de rotas HTTP
   void handleRoot();
   void handleSave();
+  void handleInfoApi(); 
 
 public:
   WifiConfig(Display& displayRef);

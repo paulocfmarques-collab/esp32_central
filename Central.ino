@@ -6,18 +6,12 @@
 #include "CommandHandler.h"
 #include <esp_task_wdt.h>
 
-// Alocação de variáveis estáticas da aplicação
-bool CommandHandler::_blinkAtivo = false;
-bool CommandHandler::_estadoLed = false;
-unsigned long CommandHandler::_ultimoToggle = 0;
-unsigned long CommandHandler::_intervaloBlink = 500;
-
 Display displayHardware;
 InterfaceCentral central(displayHardware);
 UdpComm udp(4210);
 NTPUtil ntp; 
 
-// Instância corrigida do Portal Web
+// Instância do Portal Web
 WifiConfig portalWifi(displayHardware); 
 
 // Handlers do FreeRTOS
@@ -29,7 +23,7 @@ struct PacoteRede {
   bool veioDeEscravo;
 };
 
-// ─── TAREFA EXECUTADA EXCLUSIVAMENTE NO CORE 0 (REDE / ESCUTA DE RESPOSTAS E PINGS) ───
+// ─── TAREFA EXECUTADA EXCLUSIVAMENTE NO CORE 0 (REDE / ESCUTA PASSIVA DE DADOS) ───
 void codigoCore0(void * pvParameters) {
   Serial.print("[Core 0] Inicializado no nucleo: ");
   Serial.println(xPortGetCoreID());
@@ -52,6 +46,7 @@ void codigoCore0(void * pvParameters) {
     if (WiFi.status() == WL_CONNECTED) {
       OtaManager::processar(); 
 
+      // O Core 0 funciona apenas como um escutador passivo de pacotes de rede legítimos.
       String dadosRede;
       bool veioDeEscravo = false;
       
@@ -59,15 +54,16 @@ void codigoCore0(void * pvParameters) {
         dadosRede.trim();
         
         if (veioDeEscravo) {
+          // Extrai o IP através do método público unificado da classe
           String ipRemotoReal = udp.obterIpRemotoReal();
           
-          // Confere se o IP que respondeu bate com algum cadastrado
           for (int i = 1; i <= 4; i++) {
+            // Homologa como online o ESP cujo IP cadastrado bate com o remetente
             if (udp.obterIpEscravo(i) == ipRemotoReal) {
               bool estadoRealAnterior = LayoutDatabase::statusEscravos[i];
-              LayoutDatabase::statusEscravos[i] = true; // Marca como VERDE (Online)
+              LayoutDatabase::statusEscravos[i] = true; 
               
-              // Se a tela atual for a inicial (Modo 0), atualiza os blocos imediatamente
+              // Só redesenha a interface inicial se o estado mudou na tela home
               if (estadoRealAnterior != true && central.obterModoOperacao() == 0) {
                 central.renderizarTela();
               }
@@ -76,7 +72,7 @@ void codigoCore0(void * pvParameters) {
           }
         }
 
-        // Se o pacote contiver texto útil (além do ping vazio), manda para a fila do Core 1
+        // Repassa pacotes textuais legítimos para a fila de comandos do Core 1
         if (dadosRede.length() >= 2) { 
           PacoteRede* novoPacote = new PacoteRede();
           novoPacote->payload = dadosRede;
@@ -110,12 +106,11 @@ void setup() {
     while(1);
   }
 
-  // Inicialização com as blindagens de rede aplicadas
+  // Inicialização do Portal Web e Wi-Fi
   if (portalWifi.conectar()) {
     WiFi.softAPdisconnect(true);
     
-    // ─── BLINDAGEM MÁXIMA CONTRA QUEDAS POR INATIVIDADE ───
-    // Desativa o Power Save do Wi-Fi para o roteador nunca desconectar o ESP32
+    // Desativa o Power Save do Wi-Fi para manter alta estabilidade
     WiFi.setSleep(false); 
     
     udp.inicializar();
@@ -152,7 +147,7 @@ void setup() {
   }
 }
 
-// ─── LOOP EXECUTADO NO CORE 1 (APLICAÇÃO / INTERFACE GRÁFICA) ───
+// ─── LOOP EXECUTADO NO CORE 1 (APLICAÇÃO / INTERFACE GRÁFICA / PORTAL WEB) ───
 void loop() {
   if (OtaManager::otaSolicitado && !central.otaGravando) {
     central.otaGravando = true; 
@@ -168,7 +163,7 @@ void loop() {
     tft.drawString("Nao desligue a alimentacao da Central.", 160, 100);
     tft.drawRect(20, 130, 280, 22, TFT_WHITE);
     
-    Serial.println(F("[Core 1] Painel grafico travado com seguranca. Liberando Core 0 para queima."));
+    Serial.println(F("[Core 1] Painel grafico travado. Liberando Core 0 para queima."));
   }
 
   if (central.otaGravando) {
@@ -194,12 +189,11 @@ void loop() {
           tft.drawString(String(otaProgresso) + " %", 160, 168);
       }
     }
-    
     vTaskDelay(10 / portTICK_PERIOD_MS); 
     return; 
   }
 
-  // ─── WATCHDOG GRÁFICO E RECONECTADOR AUTO-REGENERATIVO DE SOCKETS ───
+  // Auto-reconectador em caso de quedas físicas do sinal Wi-Fi
   if (WiFi.status() != WL_CONNECTED) {
     static unsigned long ultimoReconect = 0;
     
@@ -209,17 +203,17 @@ void loop() {
     
     if (millis() - ultimoReconect >= 7000) {
       ultimoReconect = millis();
-      Serial.println(F("[Rede] Reiniciando soquetes travados por inatividade..."));
+      Serial.println(F("[Rede] Reiniciando soquetes por inatividade..."));
       
       WiFi.disconnect();
       WiFi.reconnect();
-      udp.inicializar(); // Limpa e força uma nova tabela NAT no roteador
+      udp.inicializar(); 
     }
-    
     portalWifi.processarPortal();
     return;
   }
 
+  // Processamento de pacotes recebidos pela fila do FreeRTOS
   PacoteRede* pacoteRecebido;
   if (xQueueReceive(filaMensagens, &pacoteRecebido, 0) == pdPASS) {
     if (pacoteRecebido->veioDeEscravo) {
@@ -231,11 +225,13 @@ void loop() {
     delete pacoteRecebido; 
   }
 
+  // Atualizações dinâmicas da interface gráfica e periféricos
   central.atualizarRelogioDinamico();
   central.atualizarIndicadorWifi();
   central.checarAutoFechamento();
   CommandHandler::gerenciarBlinkAsync(); 
 
+  // Escuta ativa de comandos via Monitor Serial da Arduino IDE
   if (Serial.available() > 0) {
     String cmdSerial = Serial.readStringUntil('\n');
     if (cmdSerial.length() > 0) {
@@ -243,6 +239,7 @@ void loop() {
     }
   }
 
+  // Varredura geométrica de toques no vidro da tela TFT
   const char* comandoSolicitado = central.escanearToque();
   if (comandoSolicitado != nullptr) {
     if (central.obterModoOperacao() == 1) { 
@@ -253,11 +250,13 @@ void loop() {
     }
   }
 
+  // Só exibe timeout de comando se estiver controlando um ESP remoto ativamente (Modo 2)
   if (central.obterModoOperacao() == 2 && udp.checarTimeout()) {
     String alvoOffline = "ESP " + String(central.obterEscravoAtivoAlvo());
     central.exibirTelaResposta("ERRO: " + alvoOffline + "\nSEM RESPOSTA (TIMEOUT)");
   } else if (central.obterModoOperacao() != 2) {
-    // Garante que o estado de timeout não fique preso em background se mudarmos de tela
     udp.resetarEspera();
   }
+
+  portalWifi.processarPortal();
 }

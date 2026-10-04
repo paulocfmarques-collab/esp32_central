@@ -59,6 +59,12 @@ public:
         }
         return "--:--:--";
     }
+
+    bool isSincronizado() 
+    {
+        struct tm timeinfo;
+        return getLocalTime(&timeinfo, 1000);
+    }
 };
 
 extern NTPUtil ntp; // Instanciado no arquivo principal (.ino)

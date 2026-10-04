@@ -65,11 +65,11 @@ Botao LayoutDatabase::botoesAcao[TOTAL_BOTOES] = {
     {216, 130, 94, 26, "REASON",    "reason",       C_DARKGREEN,    2},
 
     {10,  95,  94, 26, "HELP",      "help",         C_DARKGREEN,    3}, 
-    {113, 95,  94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     3},
-    {216, 95,  94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     3},
-    {10,  130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     3},
-    {113, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     3},
-    {216, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     3}
+    {113, 95,  94, 26, "DST ON",    "dst_on",       C_DARKGREY,     3},
+    {216, 95,  94, 26, "DST OFF",   "dst_off",      C_DARKGREY,     3},
+    {10,  130, 94, 26, "TIME",      "time",         C_DARKGREY,     3},
+    {113, 130, 94, 26, "DATE",      "date",         C_DARKGREY,     3},
+    {216, 130, 94, 26, "PSRAM",     "psram",        C_DARKGREY,     3}
 };
 
 bool LayoutDatabase::statusEscravos[5] = {true, false, false, false, false};

@@ -11,12 +11,4 @@
 #define XPT_MOSI  32
 #define XPT_CS    33
 
-struct Botao {
-  int x, y, w, h;
-  const char* label;
-  const char* comando;
-  uint16_t cor;
-  int pagina; // <-- Identifica a página do botão (0 para Pág 1, 1 para Pág 2, etc.)
-};
-
 #endif

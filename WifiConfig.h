@@ -20,6 +20,8 @@ private:
   String _tempSenha;
   String _tempIp1;
   String _tempIp2;
+  String _tempIp3;
+  String _tempIp4;
 
   static void handleRootCallback();
   static void handleSaveCallback();

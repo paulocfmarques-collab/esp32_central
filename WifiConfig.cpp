@@ -1,6 +1,6 @@
 #include "WifiConfig.h"
 
-// HTML com os campos corretos ajustados para o CSS responsivo
+// HTML com os campos expandidos para os 4 IPs de Escravos
 const char htmlPage[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -29,6 +29,10 @@ const char htmlPage[] PROGMEM = R"rawliteral(
     <input type="text" name="ip1" value="192.168.0.120" required>
     <label>IP do Escravo 2:</label>
     <input type="text" name="ip2" value="192.168.0.125" required>
+    <label>IP do Escravo 3:</label>
+    <input type="text" name="ip3" value="192.168.0.130" required>
+    <label>IP do Escravo 4:</label>
+    <input type="text" name="ip4" value="192.168.0.135" required>
     <input type="submit" value="Salvar Configurações">
   </form>
 </div>
@@ -51,16 +55,18 @@ void WifiConfig::handleRoot() {
 }
   
 void WifiConfig::handleSave() {
-  // Captura os dados da requisição HTTP de forma rápida e segura
+  // Captura os dados da rede Wi-Fi e os 4 IPs das caixas de texto HTTP
   _tempSSID  = _server.arg("ssid");
   _tempSenha = _server.arg("senha");
   _tempIp1   = _server.arg("ip1");
   _tempIp2   = _server.arg("ip2");
+  _tempIp3   = _server.arg("ip3"); // Captura do campo novo
+  _tempIp4   = _server.arg("ip4"); // Captura do campo novo
   
-  // Responde ao navegador imediatamente antes de desligar o Wi-Fi
+  // Envia resposta imediata para o navegador antes de derrubar o ponto de acesso
   _server.send(200, "text/html", "<h2>Configuracoes recebidas! A Central esta processando e reiniciando...</h2>");
   
-  // Ativa a flag para o loop principal assumir a gravação física na Flash
+  // Ativa o gatilho para a gravação segura fora do contexto da requisição
   _dadosProntosParaSalvar = true;
 }
 
@@ -105,19 +111,21 @@ void WifiConfig::processarPortal() {
   if (WiFi.status() != WL_CONNECTED) {
     _server.handleClient();
     
-    // Executa a gravação de forma síncrona e segura fora do contexto da interrupção HTTP
+    // Processamento síncrono e seguro para não corromper o sistema de arquivos
     if (_dadosProntosParaSalvar) {
       _dadosProntosParaSalvar = false;
       
-      // Agora o barramento SPI da tela está livre e seguro para ser atualizado!
       _display.mostrarMensagemCentral("Gravando dados...", TFT_YELLOW);
       delay(500);
       
+      // Abre a partição de memória Flash para escrita ("false")
       _prefs.begin("wifi", false);
       _prefs.putString("ssid", _tempSSID);
       _prefs.putString("senha", _tempSenha);
       _prefs.putString("ip1", _tempIp1);
       _prefs.putString("ip2", _tempIp2);
+      _prefs.putString("ip3", _tempIp3); 
+      _prefs.putString("ip4", _tempIp4);
       _prefs.end();
       
       _display.mostrarMensagemCentral("Reiniciando...", TFT_GREEN);

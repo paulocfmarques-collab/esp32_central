@@ -42,6 +42,13 @@ Botao LayoutDatabase::botoesAcao[TOTAL_BOTOES] = {
     {113, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     3},
     {216, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     3},
 
+    {10,  95,  94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4}, 
+    {113, 95,  94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4}, 
+    {216, 95,  94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
+    {10,  130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
+    {113, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
+    {216, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
+
     // ════════════════ MODO REMOTO (Índices 24 a 47) ════════════════
     {10,  95,  94, 26, "LED ON",   "led_on",        C_DARKGREEN,    0}, 
     {113, 95,  94, 26, "LED OFF",  "led_off",       C_DARKGREEN,    0},
@@ -69,7 +76,14 @@ Botao LayoutDatabase::botoesAcao[TOTAL_BOTOES] = {
     {216, 95,  94, 26, "DST OFF",   "dst_off",      C_DARKGREEN,    3},
     {10,  130, 94, 26, "TIME",      "time",         C_DARKGREEN,    3},
     {113, 130, 94, 26, "DATE",      "date",         C_DARKGREEN,    3},
-    {216, 130, 94, 26, "PSRAM",     "psram",        C_DARKGREEN,    3}
+    {216, 130, 94, 26, "PSRAM",     "psram",        C_DARKGREEN,    3},
+
+    {10,  95,  94, 26, "CLOCK",     "clock",        C_DARKGREEN,    4}, 
+    {113, 95,  94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4}, 
+    {216, 95,  94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
+    {10,  130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
+    {113, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
+    {216, 130, 94, 26, "[ VAGO ]",  "vago",         C_DARKGREY,     4},
 };
 
 bool LayoutDatabase::statusEscravos[5] = {true, false, false, false, false};

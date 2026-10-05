@@ -81,7 +81,7 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp) 
 
         resp = "===== DEVICE INFO =====\n"
             "Hostname: ESP32_CENTRAL\n"
-            "Firmware: 1.0.0\n"
+            "Firmware: " + obterVersaoAutomatica() + "\n"
             "Build: " + String(__DATE__) + " " + String(__TIME__) + "\n" +
             "SSID: " + WiFi.SSID() + "\n" +
             "IP: " + WiFi.localIP().toString() + "\n" +
@@ -106,7 +106,7 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp) 
         resp = "Central Local:\nEste slot de comando esta vazio.";
     }
     else if (cmd == "version") {
-        resp = "Central Mestre:\nVersao Firmware: v1.0.0";
+        resp = "Central Mestre:\nVersao Firmware: " + obterVersaoAutomatica();
     }
     else if (cmd == "build") {
         resp = "Central Mestre Build:\nData: " + String(__DATE__) + "\nHora: " + String(__TIME__);

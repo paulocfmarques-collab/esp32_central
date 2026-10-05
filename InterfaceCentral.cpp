@@ -20,7 +20,7 @@ void InterfaceCentral::inicializar() {
     _touch.inicializar();
 }
 int InterfaceCentral::obterTotalPaginasDoModo() const {
-    return (_modoOperacao == MODO_INICIAL) ? 0 : 4;
+    return (_modoOperacao == MODO_INICIAL) ? 0 : 5;
 }
 
 void InterfaceCentral::renderizarTela() {
@@ -159,7 +159,7 @@ const char* InterfaceCentral::escanearToque() {
         // CORREÇÃO LOGICA: Reseta o soquete de espera para os comandos remotos não prenderem a tela
         udp.resetarEspera(); 
         
-        if (_paginaAtual == 3) {
+        if (_paginaAtual == 4) {
             _modoOperacao = MODO_INICIAL; _paginaAtual = 0; _escravoAtivoAlvo = 0; 
             _statusAtual = "Selecione o destino de operacao...";
         } else {
@@ -170,7 +170,7 @@ const char* InterfaceCentral::escanearToque() {
 
     // Varre de forma dinâmica os 48 botões mapeados
     for (int i = 0; i < TOTAL_BOTOES; i++) {
-        int modoBotaoNecessario = (i < 24) ? 1 : 2; 
+        int modoBotaoNecessario = (i < 30) ? 1 : 2; 
         
         if ((int)_modoOperacao == modoBotaoNecessario && LayoutDatabase::botoesAcao[i].pagina == _paginaAtual) {
             if (x >= LayoutDatabase::botoesAcao[i].x && x <= (LayoutDatabase::botoesAcao[i].x + LayoutDatabase::botoesAcao[i].w) && 

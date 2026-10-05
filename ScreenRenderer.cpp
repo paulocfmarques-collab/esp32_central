@@ -83,7 +83,7 @@ void ScreenRenderer::desenharPainelPaginas(int modo, int escravoAlvo, int pagina
 
     tft.setTextSize(1); tft.setTextDatum(MC_DATUM);
     for (int i = 0; i < TOTAL_BOTOES; i++) {
-        bool pertenceAoModo = (modo == 1 && i < 24) || (modo == 2 && i >= 24);
+        bool pertenceAoModo = (modo == 1 && i < 30) || (modo == 2 && i >= 30);
         if (pertenceAoModo && LayoutDatabase::botoesAcao[i].pagina == paginaAtual) {
             tft.fillRoundRect(LayoutDatabase::botoesAcao[i].x, LayoutDatabase::botoesAcao[i].y, LayoutDatabase::botoesAcao[i].w, LayoutDatabase::botoesAcao[i].h, 3, LayoutDatabase::botoesAcao[i].cor);
             tft.drawRoundRect(LayoutDatabase::botoesAcao[i].x, LayoutDatabase::botoesAcao[i].y, LayoutDatabase::botoesAcao[i].w, LayoutDatabase::botoesAcao[i].h, 3, TFT_WHITE);
@@ -97,13 +97,13 @@ void ScreenRenderer::desenharPainelPaginas(int modo, int escravoAlvo, int pagina
     tft.drawRoundRect(LayoutDatabase::btnProxX, LayoutDatabase::btnProxY, LayoutDatabase::btnProxW, LayoutDatabase::btnProxH, 4, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     
-    if (paginaAtual == 3) {
+    if (paginaAtual == 4) {
         tft.fillRoundRect(LayoutDatabase::btnProxX, LayoutDatabase::btnProxY, LayoutDatabase::btnProxW, LayoutDatabase::btnProxH, 4, TFT_RED);
         tft.drawRoundRect(LayoutDatabase::btnProxX, LayoutDatabase::btnProxY, LayoutDatabase::btnProxW, LayoutDatabase::btnProxH, 4, TFT_WHITE);
         tft.drawString("VOLTAR AO MENU PRINCIPAL DE IPS", LayoutDatabase::btnProxX + (LayoutDatabase::btnProxW / 2), LayoutDatabase::btnProxY + (LayoutDatabase::btnProxH / 2));
     } else {
         String nomeModo = (modo == 1) ? "LOCAIS" : "REMOTOS";
-        tft.drawString("PROXIMOS COMANDOS " + nomeModo + " (PAG " + String(paginaAtual + 2) + "/4)", LayoutDatabase::btnProxX + (LayoutDatabase::btnProxW / 2), LayoutDatabase::btnProxY + (LayoutDatabase::btnProxH / 2));
+        tft.drawString("PROXIMOS COMANDOS " + nomeModo + " (PAG " + String(paginaAtual + 1) + "/5)", LayoutDatabase::btnProxX + (LayoutDatabase::btnProxW / 2), LayoutDatabase::btnProxY + (LayoutDatabase::btnProxH / 2));
     }
     desenharRodape(status, TFT_LIGHTGREY);
 }
@@ -188,7 +188,6 @@ void ScreenRenderer::renderizarNovaLinhaResposta(const String& msg, int& yTermin
         yTerminalInOut += incrementoY;
     }
 }
-
 
 void ScreenRenderer::atualizarRelogio(unsigned long& ultimoTimestamp) {
     unsigned long agora = millis();

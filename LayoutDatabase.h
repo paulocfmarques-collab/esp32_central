@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#define TOTAL_BOTOES 48
+#define TOTAL_BOTOES 60
 #define SCREEN_W  320
 #define SCREEN_H  240
 

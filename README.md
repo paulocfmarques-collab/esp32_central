@@ -245,6 +245,15 @@ The status LED can blink without blocking the main loop.
 
 ---
 
+## License
+
+> [!TIP]
+> This project is released under a permissive open-source license that supports portfolio use, reuse, and contribution.
+
+This repository is licensed under the [MIT License](./LICENSE). You are free to use, modify, and redistribute the project under the terms described in the license file.
+
+---
+
 ## Security
 
 > [!WARNING]

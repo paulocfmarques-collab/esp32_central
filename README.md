@@ -16,22 +16,22 @@
 
 ## ✨ Visão geral
 
-O **ESP32 Central** é um projeto para controle e diagnóstico de dispositivos ESP32, combinando interface gráfica touchscreen, comunicação UDP e configuração via web. Ele foi organizado para facilitar operação em modo local e remoto, com suporte a persistência de configurações e atualização OTA.
+O **ESP32 Central** é um projeto para controle e diagnóstico de dispositivos ESP32, combinando interface gráfica touchscreen, comunicação UDP e configuração via web. A base do firmware foi organizada para oferecer operação em modo local e remoto, com persistência de configuração, sincronização de horário e suporte a atualização OTA.
 
 ---
 
-## 📁 Estrutura do repositório
+## 📁 Arquivos do repositório
 
 | Arquivo | Função |
 | --- | --- |
 | `Central.ino` | Ponto de entrada do firmware, inicialização do sistema e loop principal |
+| `Botao.h` | Estrutura/representação de botões da interface |
 | `CommandHandler.cpp` / `CommandHandler.h` | Processamento dos comandos locais e remotos |
 | `Display.cpp` / `Display.h` | Rotinas de exibição na tela TFT |
 | `ScreenRenderer.cpp` / `ScreenRenderer.h` | Renderização das telas e componentes visuais |
 | `TouchDriver.cpp` / `TouchDriver.h` | Leitura e tratamento do touch |
-| `Botao.h` | Estrutura/representação de botões da interface |
 | `InterfaceCentral.cpp` / `InterfaceCentral.h` | Organização da interface principal da central |
-| `LayoutDatabase.cpp` / `LayoutDatabase.h` | Catálogo/estrutura dos layouts e páginas da UI |
+| `LayoutDatabase.cpp` / `LayoutDatabase.h` | Catálogo e estrutura dos layouts e páginas da UI |
 | `UdpComm.cpp` / `UdpComm.h` | Comunicação UDP com os escravos |
 | `WifiConfig.cpp` / `WifiConfig.h` | Configuração e persistência de rede Wi‑Fi |
 | `NTPUtil.h` | Utilitários para sincronização de horário via NTP |

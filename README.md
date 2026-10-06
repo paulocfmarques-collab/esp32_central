@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# ESP32 Central
+![Banner](https://dummyimage.com/1400x420/0f172a/e2e8f0&text=ESP32+Central+%7C+Touchscreen+Automation+Hub)
 
 **ESP32 touchscreen control hub for local and remote device orchestration**
 
@@ -11,78 +11,67 @@
 [![Firmware](https://img.shields.io/badge/firmware-Arduino%20IDE-00979D?style=for-the-badge&logo=arduino)](https://github.com/paulocfmarques-collab/esp32_central)
 [![Connectivity](https://img.shields.io/badge/connectivity-Wi--Fi%20%2B%20UDP-00A3FF?style=for-the-badge)](https://github.com/paulocfmarques-collab/esp32_central)
 [![Display](https://img.shields.io/badge/display-TFT%20Touch-9C27B0?style=for-the-badge)](https://github.com/paulocfmarques-collab/esp32_central)
-[![Status](https://img.shields.io/badge/status-ready%20for%20portfolio-success?style=for-the-badge)](https://github.com/paulocfmarques-collab/esp32_central)
+[![Status](https://img.shields.io/badge/status-portfolio%20ready-success?style=for-the-badge)](https://github.com/paulocfmarques-collab/esp32_central)
 [![Repo Size](https://img.shields.io/github/repo-size/paulocfmarques-collab/esp32_central?style=for-the-badge)](https://github.com/paulocfmarques-collab/esp32_central)
 [![Last Commit](https://img.shields.io/github/last-commit/paulocfmarques-collab/esp32_central?style=for-the-badge)](https://github.com/paulocfmarques-collab/esp32_central/commits/main)
 
 </div>
 
-> A polished ESP32 central controller for touchscreen-based automation, diagnostics, and remote command routing over local network.
+> A polished embedded control experience for ESP32: touchscreen-driven, network-aware, and designed for real-world automation dashboards.
 
 ---
 
-## Table of Contents
+> [!NOTE]
+> This project is presented in a product-style format to highlight architecture, capability, and polish for portfolio review.
 
-- [Overview](#overview)
-- [Screenshots & Demo](#screenshots--demo)
-- [Key Features](#key-features)
-- [Repository Map](#repository-map)
-- [Architecture](#architecture)
-- [Hardware Recommended](#hardware-recommended)
-- [Installation](#installation)
-- [First Access](#first-access)
-- [Commands](#commands)
-- [Advanced Capabilities](#advanced-capabilities)
-- [Troubleshooting](#troubleshooting)
-- [Security](#security)
-- [Changelog](#changelog)
-- [Author](#author)
-- [Contributing](#contributing)
+> [!TIP]
+> Add real screenshots in `docs/screenshots/` and a short demo GIF in `docs/demo/` to make the page feel production-ready.
+
+> [!IMPORTANT]
+> This solution is intended for trusted local networks; UDP traffic is not encrypted and the web portal ships without authentication by default.
 
 ---
 
-## Overview
+## Quick Highlights
 
-**ESP32 Central** is a touchscreen-based control and diagnostics hub for ESP32 devices. It combines a graphical UI, UDP communication, Wi-Fi configuration, persistent settings, NTP synchronization, and OTA support into a compact embedded solution designed for local automation scenarios.
-
-This README is intentionally written in a product-style format to work well as a **portfolio project** or a **GitHub Marketplace-style showcase**.
+- Touch-first interface for navigation, diagnostics, and command execution
+- **LOCAL** mode for on-device control and troubleshooting
+- **REMOTE** mode for UDP-based orchestration of slave devices
+- Support for up to **4 slave nodes** on the LAN
+- Wi-Fi configuration portal at `192.168.4.1`
+- NTP time sync, persistence, and OTA support
+- Device health monitoring: CPU, RAM, flash, temperature, network, uptime
 
 ---
 
 ## Screenshots & Demo
 
-> Add your real screenshots or demo media here to make the project feel production-ready.
-
-### Suggested media placeholders
-
-| Preview | Description |
+| Preview | What it shows |
 | --- | --- |
 | `docs/screenshots/home.png` | Main dashboard / home screen |
-| `docs/screenshots/remote-mode.png` | Remote command selection UI |
-| `docs/screenshots/config-ap.png` | Wi-Fi configuration portal |
+| `docs/screenshots/remote-mode.png` | Remote command selection and execution |
+| `docs/screenshots/config-ap.png` | Access point configuration portal |
 | `docs/demo/demo.gif` | Short interaction demo |
 
-### Demo video
-
-- **YouTube / Loom / Drive link:** `https://your-demo-link-here`
-- **Live hardware walkthrough:** `https://your-live-demo-link-here`
-
-If you want, I can also generate a `docs/` folder structure and ready-to-use image captions.
+**Demo video:** `https://your-demo-link-here`
 
 ---
 
-## Key Features
+## What Makes It Stand Out
 
-- Touchscreen UI for navigation, diagnostics, and command execution
-- **LOCAL** mode for on-device control and diagnostics
-- **REMOTE** mode for UDP command delivery to slave devices
-- Support for up to **4 slave devices** on the local network
-- Built-in Wi-Fi configuration portal at `192.168.4.1`
-- Automatic **NTP** time synchronization
-- Persistent network and system configuration in flash
-- **OTA** firmware update support over the network
-- Device diagnostics: CPU, RAM, flash, temperature, network, uptime
-- Asynchronous status LED control with blink mode
+<div align="center">
+
+| Embedded UI | Network Control | Product-Ready Docs |
+| --- | --- | --- |
+| Touchscreen-driven UX | UDP command routing | Portfolio-friendly presentation |
+
+</div>
+
+> [!TIP]
+> A strong README should answer three questions immediately: what it does, how it works, and why it is impressive.
+
+> [!NOTE]
+> The sections below are organized like a product landing page: value proposition first, then proof, then setup.
 
 ---
 
@@ -258,7 +247,8 @@ The status LED can blink without blocking the main loop.
 
 ## Security
 
-This project is intended for trusted local networks.
+> [!WARNING]
+> This project is intended for trusted local networks.
 
 - UDP is not encrypted
 - The web portal has no default authentication

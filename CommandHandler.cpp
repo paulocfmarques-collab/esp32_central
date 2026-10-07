@@ -1,4 +1,135 @@
 #include "CommandHandler.h"
+#include <SPI.h>
+#include <SD.h>
+
+#define SD_SCK  18
+#define SD_MISO 19
+#define SD_MOSI 23
+#define SD_CS   5
+#define SD_RESP_MAX 1000
+
+static SPIClass sdSpi(VSPI);
+static bool sdPronto = false;
+
+static bool sdMontar() {
+    if (sdPronto) return true;
+    sdSpi.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
+    sdPronto = SD.begin(SD_CS, sdSpi, 4000000);
+    return sdPronto;
+}
+
+static bool sdCaminhoValido(const String& p) {
+    return p.length() > 0 && p[0] == '/' && p.indexOf("..") < 0;
+}
+
+static String sdTipo() {
+    switch (SD.cardType()) {
+        case CARD_MMC:  return "MMC";
+        case CARD_SD:   return "SDSC";
+        case CARD_SDHC: return "SDHC";
+        default:        return "?";
+    }
+}
+
+static bool sdRemoverPasta(const String& path) {
+    File dir = SD.open(path);
+    if (!dir || !dir.isDirectory()) return false;
+    File f = dir.openNextFile();
+    while (f) {
+        String filho = String(f.path());
+        bool isDir = f.isDirectory();
+        f.close();
+        if (isDir) sdRemoverPasta(filho); else SD.remove(filho);
+        f = dir.openNextFile();
+    }
+    dir.close();
+    return SD.rmdir(path);
+}
+
+static String executarSd(const String& original, const String& cmd) {
+    if (!sdMontar()) return "SD: cartao nao encontrado.";
+
+    // Mant?m a caixa original do argumento (cmd vem em min?sculas)
+    String arg = "";
+    int dp = original.indexOf(':');
+    if (dp >= 0) { arg = original.substring(dp + 1); arg.trim(); }
+
+    if (cmd == "sd_status") {
+        uint64_t total = SD.totalBytes() / (1024 * 1024);
+        uint64_t usado = SD.usedBytes() / (1024 * 1024);
+        return "SD: OK\nTipo: " + sdTipo() + "\nTotal: " + String((uint32_t)total) +
+               " MB\nUsado: " + String((uint32_t)usado) + " MB";
+    }
+    if (cmd == "sd_test") {
+        File f = SD.open("/_teste.tmp", FILE_WRITE);
+        if (!f) return "SD teste: falha ao criar.";
+        f.print("ok");
+        f.close();
+        f = SD.open("/_teste.tmp");
+        String lido = f ? f.readString() : "";
+        if (f) f.close();
+        SD.remove("/_teste.tmp");
+        return lido == "ok" ? "SD teste: OK" : "SD teste: FALHA";
+    }
+    if (cmd == "sd_log" || cmd.startsWith("sd_read")) {
+        String path = (cmd == "sd_log") ? "/log.txt" : arg;
+        if (!sdCaminhoValido(path)) return "Uso: sd_read:/arquivo";
+        File f = SD.open(path);
+        if (!f || f.isDirectory()) return "Arquivo nao encontrado: " + path;
+        size_t tam = f.size();
+        bool cortou = tam > SD_RESP_MAX;
+        if (cortou) f.seek(tam - SD_RESP_MAX);
+        String out = f.readString();
+        f.close();
+        if (cortou) out = "[...]\n" + out;
+        return out.length() ? out : "(vazio)";
+    }
+    if (cmd.startsWith("sd_list")) {
+        String path = arg.length() ? arg : "/";
+        if (!sdCaminhoValido(path)) return "Uso: sd_list:/pasta";
+        File dir = SD.open(path);
+        if (!dir || !dir.isDirectory()) return "Pasta nao encontrada: " + path;
+        String out = "";
+        File f = dir.openNextFile();
+        while (f && out.length() < SD_RESP_MAX - 60) {
+            out += String(f.name()) + (f.isDirectory() ? "/" : " (" + String((uint32_t)f.size()) + " B)") + "\n";
+            f.close();
+            f = dir.openNextFile();
+        }
+        if (f) { f.close(); out += "[...]"; }
+        dir.close();
+        return out.length() ? out : "(pasta vazia)";
+    }
+    if (cmd.startsWith("sd_write") || cmd.startsWith("sd_append")) {
+        int sep = arg.indexOf(':');
+        if (sep < 0) return "Uso: " + cmd.substring(0, cmd.indexOf(':')) + ":/arq:texto";
+        String path = arg.substring(0, sep);
+        String texto = arg.substring(sep + 1);
+        if (!sdCaminhoValido(path)) return "Caminho invalido.";
+        bool append = cmd.startsWith("sd_append");
+        File f = SD.open(path, append ? FILE_APPEND : FILE_WRITE);
+        if (!f) return "Falha ao abrir: " + path;
+        if (append) f.println(texto); else f.print(texto);
+        f.close();
+        return String(append ? "Adicionado em " : "Gravado em ") + path;
+    }
+    if (cmd.startsWith("sd_del")) {
+        if (!sdCaminhoValido(arg)) return "Uso: sd_del:/arquivo";
+        return SD.remove(arg) ? "Apagado: " + arg : "Falha ao apagar: " + arg;
+    }
+    if (cmd.startsWith("sd_mkdir")) {
+        if (!sdCaminhoValido(arg)) return "Uso: sd_mkdir:/pasta";
+        return SD.mkdir(arg) ? "Pasta criada: " + arg : "Falha ao criar: " + arg;
+    }
+    if (cmd.startsWith("sd_rmdir")) {
+        if (!sdCaminhoValido(arg) || arg == "/") return "Uso: sd_rmdir:/pasta";
+        return sdRemoverPasta(arg) ? "Pasta removida: " + arg : "Falha ao remover: " + arg;
+    }
+    if (cmd == "sd_clear_log") {
+        return SD.remove("/log.txt") ? "Log apagado." : "Sem log para apagar.";
+    }
+    return "Comando SD desconhecido.";
+}
 
 // Alocação física das propriedades privadas da classe
 bool CommandHandler::_blinkAtivo = false;
@@ -11,6 +142,7 @@ uint32_t CommandHandler::_mestreTotalCmd = 0;
 void CommandHandler::inicializarHardware() {
     pinMode(LED_PINOBLE, OUTPUT);
     digitalWrite(LED_PINOBLE, HIGH); 
+    sdMontar();
 }
 
 String CommandHandler::obterMotivoReset() {
@@ -66,8 +198,12 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp) 
                "set_fuso:[num] (Ex: set_fuso:-3)\n"
                "reset_wifi : Limpa Flash e abre AP\n"
                "set_escravo[1-4]:[IP]\n"
-               "--- REMOTOS SD ---\n"
-               "list / read:[arq] / del:[arq]";
+               "--- SD CARD ---\n"
+               "sd_status / sd_test / sd_log\n"
+               "sd_list[:/pasta] / sd_read:/arq\n"
+               "sd_write:/arq:txt / sd_append:/arq:txt\n"
+               "sd_del:/arq / sd_mkdir:/p / sd_rmdir:/p\n"
+               "sd_clear_log";
     }
     else if (cmd == "info") {
         String dataHoraCompleta; ntp.getDateTime(dataHoraCompleta, 100);
@@ -89,7 +225,7 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp) 
             "RSSI: " + String(WiFi.RSSI()) + " dBm\n" +
             "Heap Livre: " + String(heapLivre) + " KB\n" +
             "Flash Livre: " + String(flashLivre, 1) + " MB\n" +
-            "SD Card: N/A\n" + 
+            "SD Card: " + String(sdPronto ? "OK" : "N/A") + "\n" + 
             "Data: " + dataStr + "\n" +
             "Hora: " + horaStr + "\n" +
             "Uptime: " + String(millis()) + " ms\n" +
@@ -101,6 +237,9 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp) 
                "Motivo: " + obterMotivoReset() + "\n"
                "Uptime Atual: " + String(millis() / 1000) + " s\n"
                "========================";
+    }
+    else if (cmd.startsWith("sd_")) {
+        resp = executarSd(cmdBruto, cmd);
     }
     else if (cmd == "vago") {
         resp = "Central Local:\nEste slot de comando esta vazio.";
@@ -115,7 +254,7 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp) 
         String statusWifi = (WiFi.status() == WL_CONNECTED) ? "OK" : "FALHA";
         uint32_t heapKB = ESP.getFreeHeap() / 1024;
         resp = "ONLINE (MESTRE)\nWiFi: " + statusWifi + 
-               "\nSD: N/A" + 
+               "\nSD: " + String(sdPronto ? "OK" : "N/A") + 
                "\nNTP: " + (ntp.isSincronizado() ? "OK" : "FALHA") + 
                "\nHeap: " + String(heapKB) + " KB\n";
     }

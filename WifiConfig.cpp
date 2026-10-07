@@ -56,7 +56,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
 <div class="wrapper">
   <header>
     <h1>Central de Gerenciamento UDP</h1>
-    <p>Painel de Controle e Monitoramento do Mestre</p>
+    <p>Painel de Controle e Monitoramento do Mestre (redes salvas: ate 5, rotacao circular)</p>
   </header>
 
   <div class="tabs">
@@ -76,13 +76,17 @@ const char htmlPage[] PROGMEM = R"rawliteral(
   <!-- ABA 2: CONFIGURAÇÃO DE IPS DOS ESCRAVOS -->
   <div id="config" class="tab-content">
     <form action="/salvar" method="POST">
-      <div class="form-group">
-        <label>SSID do Wi-Fi Principal:</label>
-        <input type="text" name="ssid" placeholder="Nome da rede roteadora" required>
-      </div>
-      <div class="form-group">
-        <label>Senha do Wi-Fi:</label>
-        <input type="password" name="senha" placeholder="Senha da rede">
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
+        <div class="form-group"><label>Rede 1 - SSID:</label><input type="text" name="ssid0" id="form-ssid0"></div>
+        <div class="form-group"><label>Rede 1 - Senha:</label><input type="password" name="senha0" placeholder="(vazio = manter)"></div>
+        <div class="form-group"><label>Rede 2 - SSID:</label><input type="text" name="ssid1" id="form-ssid1"></div>
+        <div class="form-group"><label>Rede 2 - Senha:</label><input type="password" name="senha1" placeholder="(vazio = manter)"></div>
+        <div class="form-group"><label>Rede 3 - SSID:</label><input type="text" name="ssid2" id="form-ssid2"></div>
+        <div class="form-group"><label>Rede 3 - Senha:</label><input type="password" name="senha2" placeholder="(vazio = manter)"></div>
+        <div class="form-group"><label>Rede 4 - SSID:</label><input type="text" name="ssid3" id="form-ssid3"></div>
+        <div class="form-group"><label>Rede 4 - Senha:</label><input type="password" name="senha3" placeholder="(vazio = manter)"></div>
+        <div class="form-group"><label>Rede 5 - SSID:</label><input type="text" name="ssid4" id="form-ssid4"></div>
+        <div class="form-group"><label>Rede 5 - Senha:</label><input type="password" name="senha4" placeholder="(vazio = manter)"></div>
       </div>
       <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
         <div class="form-group"><label>Endereço IP - Escravo 1:</label><input type="text" name="ip1" id="form-ip1" required></div>
@@ -112,7 +116,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         grid.innerHTML = '';
         
         Object.keys(data).forEach(key => {
-          if(key.startsWith('_form_ip')) return; 
+          if(key.startsWith('_form_')) return; 
           
           const card = document.createElement('div');
           card.className = 'card';
@@ -121,6 +125,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
           grid.appendChild(card);
         });
 
+        for(let i = 0; i < 5; i++) { const el = document.getElementById('form-ssid' + i); if(el && data['_form_ssid' + i] !== undefined) el.value = data['_form_ssid' + i]; }
         if(data._form_ip1) document.getElementById('form-ip1').value = data._form_ip1;
         if(data._form_ip2) document.getElementById('form-ip2').value = data._form_ip2;
         if(data._form_ip3) document.getElementById('form-ip3').value = data._form_ip3;
@@ -147,8 +152,13 @@ WifiConfig::WifiConfig(Display& displayRef)
 void WifiConfig::handleRootCallback() { if (_instance) _instance->handleRoot(); }
 void WifiConfig::handleSaveCallback() { if (_instance) _instance->handleSave(); }
 void WifiConfig::handleInfoApiCallback() { if (_instance) _instance->handleInfoApi(); }
+void WifiConfig::handleInfoPageCallback() { if (_instance) _instance->handleInfoPage(); }
 
 void WifiConfig::handleRoot() { 
+  _server.send(200, "text/html", htmlPage); 
+}
+
+void WifiConfig::handleInfoPage() {
   _server.send(200, "text/html", htmlPage); 
 }
 
@@ -165,6 +175,19 @@ void WifiConfig::handleInfoApi() {
     json += "\"flash_livre\":\"" + String((float)ESP.getFreeSketchSpace() / (1024.0 * 1024.0), 1) + " MB\",";
     json += "\"uptime_sistema\":\"" + String(millis() / 1000) + " segundos\",";
     json += "\"motivo_reset\":\"" + CommandHandler::obterMotivoReset() + "\",";
+    json += "\"mac\":\"" + WiFi.macAddress() + "\",";
+    json += "\"gateway\":\"" + WiFi.gatewayIP().toString() + "\",";
+    json += "\"dns\":\"" + WiFi.dnsIP(0).toString() + "\",";
+    json += "\"build\":\"" + String(__DATE__) + " " + String(__TIME__) + "\",";
+    json += "\"temp_cpu\":\"" + String(temperatureRead(), 1) + " C\",";
+    json += "\"cpu_mhz\":\"" + String(ESP.getCpuFreqMHz()) + " MHz\",";
+    {
+      _prefs.begin("wifi", true);
+      for (int i = 0; i < MAX_REDES; i++) {
+        json += "\"_form_ssid" + String(i) + "\":\"" + _prefs.getString(("s" + String(i)).c_str(), "") + "\",";
+      }
+      _prefs.end();
+    }
     
     // Injeta os IPs em cache na RAM para preenchimento automático das caixas no JavaScript
     json += "\"_form_ip1\":\"" + udp.obterIpEscravo(1) + "\",";
@@ -177,8 +200,11 @@ void WifiConfig::handleInfoApi() {
 }
   
 void WifiConfig::handleSave() {
-  _tempSSID  = _server.arg("ssid");
-  _tempSenha = _server.arg("senha");
+  for (int i = 0; i < MAX_REDES; i++) {
+    _tempSSIDs[i]  = _server.arg("ssid" + String(i));
+    _tempSenhas[i] = _server.arg("senha" + String(i));
+    _tempSSIDs[i].trim();
+  }
   _tempIp1   = _server.arg("ip1");
   _tempIp2   = _server.arg("ip2");
   _tempIp3   = _server.arg("ip3"); 
@@ -188,26 +214,66 @@ void WifiConfig::handleSave() {
   _dadosProntosParaSalvar = true;
 }
 
-bool WifiConfig::conectar() {
-  _prefs.begin("wifi", true);
-  String ssid = _prefs.getString("ssid", "");
-  String password = _prefs.getString("senha", "");
-  _prefs.end();
-
-  if (ssid == "") return false;
-
-  WiFi.mode(WIFI_AP_STA); 
-  WiFi.begin(ssid.c_str(), password.c_str());
-  _display.mostrarMensagemCentral("Conectando ao Wi-Fi...");
+bool WifiConfig::tentarConectar(const String& ssid, const String& senha) {
+  WiFi.disconnect();
+  WiFi.begin(ssid.c_str(), senha.c_str());
+  _display.mostrarMensagemCentral(("Conectando: " + ssid).c_str());
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 14) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 20) {
     delay(500);
     tentativas++;
   }
-  
-  if (WiFi.status() == WL_CONNECTED) {
+  return WiFi.status() == WL_CONNECTED;
+}
+
+bool WifiConfig::conectar() {
+  _prefs.begin("wifi", false);
+  // Migra a rede unica antiga para o slot 0
+  if (_prefs.getString("s0", "") == "" && _prefs.getString("ssid", "") != "") {
+    _prefs.putString("s0", _prefs.getString("ssid", ""));
+    _prefs.putString("p0", _prefs.getString("senha", ""));
+  }
+  String ssids[MAX_REDES], senhas[MAX_REDES];
+  bool temRede = false;
+  for (int i = 0; i < MAX_REDES; i++) {
+    ssids[i]  = _prefs.getString(("s" + String(i)).c_str(), "");
+    senhas[i] = _prefs.getString(("p" + String(i)).c_str(), "");
+    if (ssids[i] != "") temRede = true;
+  }
+  int ultimo = _prefs.getInt("idx", -1);
+  _prefs.end();
+
+  if (!temRede) return false;
+
+  WiFi.mode(WIFI_AP_STA);
+  _display.mostrarMensagemCentral("Buscando redes...");
+  int n = WiFi.scanNetworks();
+
+  // Lista circular: comeca na rede seguinte a ultima usada
+  bool conectado = false;
+  for (int k = 1; k <= MAX_REDES && !conectado; k++) {
+    int i = (ultimo + k + MAX_REDES) % MAX_REDES;
+    if (ssids[i] == "") continue;
+
+    bool visivel = false;
+    for (int j = 0; j < n; j++) {
+      if (WiFi.SSID(j) == ssids[i]) { visivel = true; break; }
+    }
+    if (!visivel) continue;
+
+    if (tentarConectar(ssids[i], senhas[i])) {
+      _prefs.begin("wifi", false);
+      _prefs.putInt("idx", i);
+      _prefs.end();
+      conectado = true;
+    }
+  }
+  WiFi.scanDelete();
+
+  if (conectado) {
       _server.on("/", HTTP_GET, WifiConfig::handleRootCallback);
+      _server.on("/info", HTTP_GET, WifiConfig::handleInfoPageCallback);
       _server.on("/salvar", HTTP_POST, WifiConfig::handleSaveCallback);
       _server.on("/api/info", HTTP_GET, WifiConfig::handleInfoApiCallback);
       _server.begin();
@@ -229,6 +295,7 @@ void WifiConfig::iniciarPortal() {
   tft.drawString("Acesse o IP: 192.168.4.1", 10, 100);
 
   _server.on("/", HTTP_GET, WifiConfig::handleRootCallback);
+  _server.on("/info", HTTP_GET, WifiConfig::handleInfoPageCallback);
   _server.on("/salvar", HTTP_POST, WifiConfig::handleSaveCallback);
   _server.on("/api/info", HTTP_GET, WifiConfig::handleInfoApiCallback);
   _server.begin();
@@ -244,8 +311,21 @@ void WifiConfig::processarPortal() {
     delay(500);
     
     _prefs.begin("wifi", false);
-    _prefs.putString("ssid", _tempSSID);
-    _prefs.putString("senha", _tempSenha);
+    for (int i = 0; i < MAX_REDES; i++) {
+      String chaveS = "s" + String(i), chaveP = "p" + String(i);
+      if (_tempSSIDs[i] == "") {
+        _prefs.remove(chaveS.c_str());
+        _prefs.remove(chaveP.c_str());
+      } else {
+        // Senha vazia com o mesmo SSID mantem a senha ja salva
+        bool mesmaRede = (_prefs.getString(chaveS.c_str(), "") == _tempSSIDs[i]);
+        if (_tempSenhas[i] != "" || !mesmaRede) _prefs.putString(chaveP.c_str(), _tempSenhas[i]);
+        _prefs.putString(chaveS.c_str(), _tempSSIDs[i]);
+      }
+    }
+    _prefs.remove("ssid");
+    _prefs.remove("senha");
+    _prefs.putInt("idx", -1);
     _prefs.putString("ip1", _tempIp1);
     _prefs.putString("ip2", _tempIp2);
     _prefs.putString("ip3", _tempIp3); 

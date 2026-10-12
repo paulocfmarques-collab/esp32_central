@@ -28,6 +28,8 @@ private:
   static void handleRootCallback();
   static void handleSaveCallback();
   static void handleInfoApiCallback();
+  static void handleLogCallback();
+  void handleLog();
   static void handleInfoPageCallback(); 
 
   // Métodos internos de processamento de rotas HTTP

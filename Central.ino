@@ -5,6 +5,9 @@
 #include "NTPUtil.h"
 #include "CommandHandler.h"
 #include <esp_task_wdt.h>
+#include "ClimaManager.h"
+#include "SerialCommands.h"
+#include "SdManager.h"
 
 Display displayHardware;
 InterfaceCentral central(displayHardware);
@@ -21,6 +24,7 @@ QueueHandle_t filaMensagens;
 struct PacoteRede {
   String payload;
   bool veioDeEscravo;
+  String remetente;
 };
 
 // ─── TAREFA EXECUTADA EXCLUSIVAMENTE NO CORE 0 (REDE / ESCUTA PASSIVA DE DADOS) ───
@@ -73,10 +77,11 @@ void codigoCore0(void * pvParameters) {
         }
 
         // Repassa pacotes textuais legítimos para a fila de comandos do Core 1
-        if (dadosRede.length() >= 2) { 
+        if (dadosRede.length() >= 1) { 
           PacoteRede* novoPacote = new PacoteRede();
           novoPacote->payload = dadosRede;
           novoPacote->veioDeEscravo = veioDeEscravo;
+          novoPacote->remetente = udp.obterIpRemotoReal();
 
           if (xQueueSend(filaMensagens, &novoPacote, pdMS_TO_TICKS(10)) != pdPASS) {
             Serial.println(F("[Core 0] ERRO: Fila cheia."));
@@ -93,6 +98,7 @@ void codigoCore0(void * pvParameters) {
 
 void setup() {
   Serial.begin(115200);
+  Serial.println(F("[SERIAL] 115200 baud. Envie help seguido de Enter (CR/LF)."));
   
   central.otaGravando = false; 
 
@@ -194,6 +200,12 @@ void loop() {
   }
 
   // Auto-reconectador em caso de quedas físicas do sinal Wi-Fi
+  // A serial permanece disponivel mesmo sem conexao Wi-Fi.
+  SerialCommands::processar();
+  SdManager::processar();
+  CommandHandler::gerenciarBlinkAsync();
+  ClimaManager::atualizar();
+  central.atualizarDiagnosticos();
   if (WiFi.status() != WL_CONNECTED) {
     static unsigned long ultimoReconect = 0;
     
@@ -210,6 +222,8 @@ void loop() {
       udp.inicializar(); 
     }
     portalWifi.processarPortal();
+    central.escanearToque();
+    central.checarAutoFechamento();
     return;
   }
 
@@ -217,10 +231,14 @@ void loop() {
   PacoteRede* pacoteRecebido;
   if (xQueueReceive(filaMensagens, &pacoteRecebido, 0) == pdPASS) {
     if (pacoteRecebido->veioDeEscravo) {
+      SdManager::registrar("RESPOSTA_RX", "udp:" + pacoteRecebido->remetente, pacoteRecebido->payload);
+      Serial.println(F("[ESP RX]"));
+      Serial.println(pacoteRecebido->payload);
+      Serial.println(F("[FIM ESP RX]"));
       udp.resetarEspera(); 
       central.acumularMensagemResposta(pacoteRecebido->payload);
     } else {
-      CommandHandler::executar(pacoteRecebido->payload, true);
+      CommandHandler::executar(pacoteRecebido->payload, true, ("udp:" + pacoteRecebido->remetente).c_str());
     }
     delete pacoteRecebido; 
   }
@@ -229,15 +247,6 @@ void loop() {
   central.atualizarRelogioDinamico();
   central.atualizarIndicadorWifi();
   central.checarAutoFechamento();
-  CommandHandler::gerenciarBlinkAsync(); 
-
-  // Escuta ativa de comandos via Monitor Serial da Arduino IDE
-  if (Serial.available() > 0) {
-    String cmdSerial = Serial.readStringUntil('\n');
-    if (cmdSerial.length() > 0) {
-      CommandHandler::executar(cmdSerial, false);
-    }
-  }
 
   // Varredura geométrica de toques no vidro da tela TFT
   const char* comandoSolicitado = central.escanearToque();
@@ -246,6 +255,7 @@ void loop() {
       CommandHandler::executar(String(comandoSolicitado), false);
     } 
     else if (central.obterModoOperacao() == 2) { 
+      SdManager::registrar("COMANDO_RX", "tela:ESP" + String(central.obterEscravoAtivoAlvo()), comandoSolicitado);
       udp.enviarComando(comandoSolicitado, central.obterEscravoAtivoAlvo()); 
     }
   }
@@ -253,6 +263,8 @@ void loop() {
   // Só exibe timeout de comando se estiver controlando um ESP remoto ativamente (Modo 2)
   if (central.obterModoOperacao() == 2 && udp.checarTimeout()) {
     String alvoOffline = "ESP " + String(central.obterEscravoAtivoAlvo());
+    Serial.println("[ESP ERRO] " + alvoOffline + " sem resposta (timeout).");
+    SdManager::registrar("ERRO", alvoOffline, "Sem resposta (timeout)");
     central.exibirTelaResposta("ERRO: " + alvoOffline + "\nSEM RESPOSTA (TIMEOUT)");
   } else if (central.obterModoOperacao() != 2) {
     udp.resetarEspera();

@@ -1,146 +1,20 @@
 #include "WifiConfig.h"
 #include "CommandHandler.h"
 
-// Interface gráfica avançada - PARTE 1 (CSS e Estrutura Base)
-const char htmlPage[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Central UDP</title>
-<style>
-  :root {
-    --bg-color: #0f172a;
-    --card-bg: #1e293b;
-    --primary: #3b82f6;
-    --success: #10b981;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --border: #334155;
+#include "WebPageGzip.h"
+#include "ClimaManager.h"
+#include "SdManager.h"
+
+static String jsonTexto(const String& texto) {
+  String out = "\"";
+  for (size_t i = 0; i < texto.length(); ++i) {
+    unsigned char c = texto[i];
+    if (c == '"' || c == '\\') { out += '\\'; out += char(c); }
+    else if (c < 32) { char codigo[7]; snprintf(codigo, sizeof(codigo), "\\u%04x", c); out += codigo; }
+    else out += char(c);
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-  body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; display: flex; flex-direction: column; align-items: center; }
-  .wrapper { width: 100%; max-width: 700px; }
-  header { text-align: center; margin-bottom: 25px; }
-  header h1 { font-size: 24px; color: #f1f5f9; }
-  header p { color: var(--text-muted); font-size: 14px; margin-top: 5px; }
-  
-  /* Sistema de Abas Navegáveis */
-  .tabs { display: flex; background: var(--card-bg); border-radius: 8px; padding: 4px; margin-bottom: 20px; border: 1px solid var(--border); }
-  .tab-btn { flex: 1; padding: 10px; background: transparent; border: none; color: var(--text-muted); font-weight: 600; cursor: pointer; border-radius: 6px; transition: all 0.2s; }
-  .tab-btn.active { background: var(--primary); color: var(--text-main); }
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* Estilos do Painel de Diagnóstico */
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-  .card { background: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; }
-  .card .label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px; }
-  .card .value { font-size: 18px; font-weight: 600; color: #fff; margin-top: 5px; word-break: break-all; }
-  .refresh-area { text-align: center; margin-top: 10px; }
-  .btn { background: var(--primary); color: white; border: none; padding: 12px 20px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; transition: opacity 0.2s; }
-  .btn:hover { opacity: 0.9; }
-  .btn-success { background: var(--success); }
-
-  /* Estilos do Form de Configurações */
-  form { background: var(--card-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border); }
-  .form-group { margin-bottom: 15px; }
-  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #cbd5e1; }
-  input { width: 100%; padding: 10px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: white; font-size: 14px; }
-  input:focus { border-color: var(--primary); outline: none; }
-</style>
-</head>
-<body>
-
-<div class="wrapper">
-  <header>
-    <h1>Central de Gerenciamento UDP</h1>
-    <p>Painel de Controle e Monitoramento do Mestre (redes salvas: ate 5, rotacao circular)</p>
-  </header>
-
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('dashboard')">Status do Sistema</button>
-    <button class="tab-btn" onclick="switchTab('config')">Configurar Dispositivos</button>
-  </div>
-
-  <!-- ABA 1: DASHBOARD DINÂMICO -->
-  <div id="dashboard" class="tab-content active">
-    <div class="grid" id="info-grid">
-      <div class="card"><div class="label">Carregando dados...</div><div class="value">---</div></div>
-    </div>
-    <div class="refresh-area">
-      <button class="btn" onclick="atualizarDadosInfo()">Atualizar Diagnóstico</button>
-    </div>
-  </div>
-  <!-- ABA 2: CONFIGURAÇÃO DE IPS DOS ESCRAVOS -->
-  <div id="config" class="tab-content">
-    <form action="/salvar" method="POST">
-      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
-        <div class="form-group"><label>Rede 1 - SSID:</label><input type="text" name="ssid0" id="form-ssid0"></div>
-        <div class="form-group"><label>Rede 1 - Senha:</label><input type="password" name="senha0" placeholder="(vazio = manter)"></div>
-        <div class="form-group"><label>Rede 2 - SSID:</label><input type="text" name="ssid1" id="form-ssid1"></div>
-        <div class="form-group"><label>Rede 2 - Senha:</label><input type="password" name="senha1" placeholder="(vazio = manter)"></div>
-        <div class="form-group"><label>Rede 3 - SSID:</label><input type="text" name="ssid2" id="form-ssid2"></div>
-        <div class="form-group"><label>Rede 3 - Senha:</label><input type="password" name="senha2" placeholder="(vazio = manter)"></div>
-        <div class="form-group"><label>Rede 4 - SSID:</label><input type="text" name="ssid3" id="form-ssid3"></div>
-        <div class="form-group"><label>Rede 4 - Senha:</label><input type="password" name="senha3" placeholder="(vazio = manter)"></div>
-        <div class="form-group"><label>Rede 5 - SSID:</label><input type="text" name="ssid4" id="form-ssid4"></div>
-        <div class="form-group"><label>Rede 5 - Senha:</label><input type="password" name="senha4" placeholder="(vazio = manter)"></div>
-      </div>
-      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
-        <div class="form-group"><label>Endereço IP - Escravo 1:</label><input type="text" name="ip1" id="form-ip1" required></div>
-        <div class="form-group"><label>Endereço IP - Escravo 2:</label><input type="text" name="ip2" id="form-ip2" required></div>
-        <div class="form-group"><label>Endereço IP - Escravo 3:</label><input type="text" name="ip3" id="form-ip3" required></div>
-        <div class="form-group"><label>Endereço IP - Escravo 4:</label><input type="text" name="ip4" id="form-ip4" required></div>
-      </div>
-      <button type="submit" class="btn btn-success">Salvar e Reiniciar Central</button>
-    </form>
-  </div>
-</div>
-
-<script>
-  function switchTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
-    if(tabId === 'dashboard') atualizarDadosInfo();
-  }
-
-  function atualizarDadosInfo() {
-    fetch('/api/info')
-      .then(response => response.json())
-      .then(data => {
-        const grid = document.getElementById('info-grid');
-        grid.innerHTML = '';
-        
-        Object.keys(data).forEach(key => {
-          if(key.startsWith('_form_')) return; 
-          
-          const card = document.createElement('div');
-          card.className = 'card';
-          let labelText = key.replace('_', ' ').toUpperCase();
-          card.innerHTML = `<div class="label">${labelText}</div><div class="value">${data[key]}</div>`;
-          grid.appendChild(card);
-        });
-
-        for(let i = 0; i < 5; i++) { const el = document.getElementById('form-ssid' + i); if(el && data['_form_ssid' + i] !== undefined) el.value = data['_form_ssid' + i]; }
-        if(data._form_ip1) document.getElementById('form-ip1').value = data._form_ip1;
-        if(data._form_ip2) document.getElementById('form-ip2').value = data._form_ip2;
-        if(data._form_ip3) document.getElementById('form-ip3').value = data._form_ip3;
-        if(data._form_ip4) document.getElementById('form-ip4').value = data._form_ip4;
-      })
-      .catch(err => {
-        document.getElementById('info-grid').innerHTML = '<div class="card" style="grid-column: 1/-1; text-align:center;"><div class="label" style="color:#ef4444;">Erro de Comunicação</div><div class="value">Não foi possível acessar a API interna.</div></div>';
-      });
-  }
-
-  window.onload = atualizarDadosInfo;
-</script>
-</body>
-</html>
-)rawliteral";
+  return out + "\"";
+}
 
 WifiConfig* WifiConfig::_instance = nullptr;
 
@@ -153,53 +27,125 @@ void WifiConfig::handleRootCallback() { if (_instance) _instance->handleRoot(); 
 void WifiConfig::handleSaveCallback() { if (_instance) _instance->handleSave(); }
 void WifiConfig::handleInfoApiCallback() { if (_instance) _instance->handleInfoApi(); }
 void WifiConfig::handleInfoPageCallback() { if (_instance) _instance->handleInfoPage(); }
+void WifiConfig::handleLogCallback() { if (_instance) _instance->handleLog(); }
+
+void WifiConfig::handleLog() {
+  String conteudo;
+  int status = 200;
+  {
+    SdManager::Acesso acesso;
+    if (!acesso.pronto()) { status = 503; conteudo = "Cartao SD indisponivel."; }
+    else {
+      File arquivo = SD.open("/log.txt", FILE_READ);
+      if (!arquivo) { status = 404; conteudo = "Arquivo de log ainda nao disponivel."; }
+      else {
+        size_t tamanho = arquivo.size();
+        bool parcial = tamanho > 16384;
+        if (parcial) arquivo.seek(tamanho - 16384);
+        // Comeca numa linha completa quando apenas a cauda do arquivo e exibida.
+        if (parcial) while (arquivo.available() && arquivo.read() != '\n') {}
+        conteudo.reserve(16384);
+        char bloco[513];
+        while (arquivo.available() && conteudo.length() < 16384) {
+          size_t quantidade = arquivo.read(reinterpret_cast<uint8_t*>(bloco), min(size_t(512), size_t(16384 - conteudo.length())));
+          if (!quantidade) break;
+          bloco[quantidade] = 0;
+          conteudo += bloco;
+        }
+        arquivo.close();
+      }
+    }
+  }
+  _server.sendHeader("Cache-Control", "no-store");
+  _server.send(status, "text/plain; charset=utf-8", conteudo);
+}
 
 void WifiConfig::handleRoot() { 
-  _server.send(200, "text/html", htmlPage); 
+  _server.sendHeader("Content-Encoding", "gzip");
+  _server.sendHeader("Cache-Control", "no-store");
+  _server.send_P(200, "text/html; charset=utf-8", reinterpret_cast<const char*>(htmlPageGzip), sizeof(htmlPageGzip));
 }
 
 void WifiConfig::handleInfoPage() {
-  _server.send(200, "text/html", htmlPage); 
+  handleRoot();
 }
 
 void WifiConfig::handleInfoApi() {
-    extern UdpComm udp;
-    String json = "{";
-    
-    json += "\"hostname\":\"ESP32_MESTRE\",";
-    json += "\"firmware\":\"1.0.0_MSTR\",";
-    json += "\"rede_ssid\":\"" + WiFi.SSID() + "\",";
-    json += "\"ip_local\":\"" + WiFi.localIP().toString() + "\",";
-    json += "\"sinal_rssi\":\"" + String(WiFi.RSSI()) + " dBm\",";
-    json += "\"ram_livre\":\"" + String(ESP.getFreeHeap() / 1024) + " KB\",";
-    json += "\"flash_livre\":\"" + String((float)ESP.getFreeSketchSpace() / (1024.0 * 1024.0), 1) + " MB\",";
-    json += "\"uptime_sistema\":\"" + String(millis() / 1000) + " segundos\",";
-    json += "\"motivo_reset\":\"" + CommandHandler::obterMotivoReset() + "\",";
-    json += "\"mac\":\"" + WiFi.macAddress() + "\",";
-    json += "\"gateway\":\"" + WiFi.gatewayIP().toString() + "\",";
-    json += "\"dns\":\"" + WiFi.dnsIP(0).toString() + "\",";
-    json += "\"build\":\"" + String(__DATE__) + " " + String(__TIME__) + "\",";
-    json += "\"temp_cpu\":\"" + String(temperatureRead(), 1) + " C\",";
-    json += "\"cpu_mhz\":\"" + String(ESP.getCpuFreqMHz()) + " MHz\",";
-    {
-      _prefs.begin("wifi", true);
-      for (int i = 0; i < MAX_REDES; i++) {
-        json += "\"_form_ssid" + String(i) + "\":\"" + _prefs.getString(("s" + String(i)).c_str(), "") + "\",";
-      }
-      _prefs.end();
+  extern UdpComm udp;
+  bool conectado = WiFi.status() == WL_CONNECTED;
+  String json;
+  json.reserve(2600);
+  json = "{";
+  auto campo = [&](const String& nome, const String& valor) {
+    json += jsonTexto(nome) + ":" + jsonTexto(valor) + ",";
+  };
+  campo("hostname", "ESP32_CENTRAL");
+  campo("firmware", CommandHandler::obterVersaoAutomatica());
+  campo("modo_rede", conectado ? "Wi-Fi conectado" : "Portal de configuracao / sem Wi-Fi");
+  campo("rede_ssid", conectado ? WiFi.SSID() : "ESP32_CENTRAL_CONFIG");
+  campo("ip_local", conectado ? WiFi.localIP().toString() : WiFi.softAPIP().toString());
+  campo("sinal_rssi", conectado ? String(WiFi.RSSI()) + " dBm" : "Sem sinal");
+  campo("ram_livre", String(ESP.getFreeHeap() / 1024) + " KB");
+  campo("flash_livre", String(float(ESP.getFreeSketchSpace()) / (1024 * 1024), 1) + " MB");
+  campo("motivo_reset", CommandHandler::obterMotivoReset());
+  campo("mac", WiFi.macAddress());
+  campo("gateway", conectado ? WiFi.gatewayIP().toString() : "--");
+  campo("dns", conectado ? WiFi.dnsIP().toString() : "--");
+  campo("build", String(__DATE__) + " " + __TIME__);
+  float temperaturaCpu = temperatureRead();
+  campo("temp_cpu", isfinite(temperaturaCpu) ? String(temperaturaCpu, 1) + " C" : "Indisponivel");
+  campo("cpu_mhz", String(ESP.getCpuFreqMHz()) + " MHz");
+  json += "\"wifi_conectado\":" + String(conectado ? "true" : "false") + ",";
+  json += "\"rssi_dbm\":" + String(conectado ? WiFi.RSSI() : -127) + ",";
+  json += "\"uptime_segundos\":" + String(millis() / 1000) + ",";
+  _prefs.begin("wifi", true);
+  for (int i = 0; i < MAX_REDES; ++i)
+    campo("_form_ssid" + String(i), _prefs.getString(("s" + String(i)).c_str(), ""));
+  for (int i = 1; i <= 4; ++i) {
+    String ip = udp.obterIpEscravo(i);
+    if (!ip.length()) {
+      const char* padroes[] = {"192.168.0.120", "192.168.0.125", "192.168.0.130", "192.168.0.135"};
+      ip = _prefs.getString(("ip" + String(i)).c_str(), padroes[i - 1]);
     }
-    
-    // Injeta os IPs em cache na RAM para preenchimento automático das caixas no JavaScript
-    json += "\"_form_ip1\":\"" + udp.obterIpEscravo(1) + "\",";
-    json += "\"_form_ip2\":\"" + udp.obterIpEscravo(2) + "\",";
-    json += "\"_form_ip3\":\"" + udp.obterIpEscravo(3) + "\",";
-    json += "\"_form_ip4\":\"" + udp.obterIpEscravo(4) + "\"";
-    json += "}";
-    
-    _server.send(200, "application/json", json);
+    campo("_form_ip" + String(i), ip);
+    json += "\"esp" + String(i) + "_online\":" + String(LayoutDatabase::statusEscravos[i] ? "true" : "false") + ",";
+  }
+  _prefs.end();
+  auto clima = ClimaManager::snapshot();
+  json += "\"clima\":{";
+  json += "\"sincronizado\":" + String(clima.sincronizado ? "true" : "false") + ",";
+  json += "\"previsao_valida\":" + String(clima.previsaoValida ? "true" : "false") + ",";
+  json += "\"ultima_falhou\":" + String(clima.ultimaFalhou ? "true" : "false") + ",";
+  json += "\"temperatura\":" + String(clima.temperatura, 1) + ",";
+  json += "\"umidade\":" + String(clima.umidade) + ",";
+  json += "\"minima\":" + String(clima.minima, 1) + ",";
+  json += "\"maxima\":" + String(clima.maxima, 1) + ",";
+  json += "\"chuva\":" + String(clima.chuva) + ",";
+  json += "\"idade_s\":" + String((millis() - clima.ultimaAtualizacao) / 1000) + ",";
+  json += "\"data\":" + jsonTexto(String(clima.data)) + ",";
+  json += "\"condicao\":" + jsonTexto(ClimaManager::obterTextoCondicao()) + "}}";
+  _server.sendHeader("Cache-Control", "no-store");
+  _server.send(200, "application/json; charset=utf-8", json);
 }
-  
 void WifiConfig::handleSave() {
+  if (_dadosProntosParaSalvar) {
+    _server.send(409, "text/plain; charset=utf-8", "Configuracoes ja estao sendo aplicadas.");
+    return;
+  }
+  for (int i = 1; i <= 4; ++i) {
+    IPAddress ip;
+    String valor = _server.arg("ip" + String(i)); valor.trim();
+    if (!ip.fromString(valor)) {
+      _server.send(400, "text/plain; charset=utf-8", "Endereco IPv4 invalido para ESP " + String(i));
+      return;
+    }
+  }
+  for (int i = 0; i < MAX_REDES; ++i) {
+    if (_server.arg("ssid" + String(i)).length() > 32 || _server.arg("senha" + String(i)).length() > 63) {
+      _server.send(400, "text/plain; charset=utf-8", "Nome ou senha da rede excede o tamanho permitido.");
+      return;
+    }
+  }
   for (int i = 0; i < MAX_REDES; i++) {
     _tempSSIDs[i]  = _server.arg("ssid" + String(i));
     _tempSenhas[i] = _server.arg("senha" + String(i));
@@ -209,6 +155,7 @@ void WifiConfig::handleSave() {
   _tempIp2   = _server.arg("ip2");
   _tempIp3   = _server.arg("ip3"); 
   _tempIp4   = _server.arg("ip4"); 
+  _tempIp1.trim(); _tempIp2.trim(); _tempIp3.trim(); _tempIp4.trim();
   
   _server.send(200, "text/html", "<h2>Configuracoes salvas! A Central esta aplicando os dados e reiniciando...</h2>");
   _dadosProntosParaSalvar = true;
@@ -276,6 +223,7 @@ bool WifiConfig::conectar() {
       _server.on("/info", HTTP_GET, WifiConfig::handleInfoPageCallback);
       _server.on("/salvar", HTTP_POST, WifiConfig::handleSaveCallback);
       _server.on("/api/info", HTTP_GET, WifiConfig::handleInfoApiCallback);
+      _server.on("/api/log", HTTP_GET, WifiConfig::handleLogCallback);
       _server.begin();
       return true;
   }
@@ -298,6 +246,7 @@ void WifiConfig::iniciarPortal() {
   _server.on("/info", HTTP_GET, WifiConfig::handleInfoPageCallback);
   _server.on("/salvar", HTTP_POST, WifiConfig::handleSaveCallback);
   _server.on("/api/info", HTTP_GET, WifiConfig::handleInfoApiCallback);
+  _server.on("/api/log", HTTP_GET, WifiConfig::handleLogCallback);
   _server.begin();
 }
 

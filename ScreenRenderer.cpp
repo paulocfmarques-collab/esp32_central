@@ -2,12 +2,60 @@
 #include "NTPUtil.h"
 #include "UdpComm.h"
 #include <WiFi.h>
+#include "ClimaManager.h"
+#include "SdManager.h"
 
 // A Forward Declaration instável antiga foi completamente removida daqui!
 
-ScreenRenderer::ScreenRenderer(Display& displayHardware) : _display(displayHardware) {}
+ScreenRenderer::ScreenRenderer(Display& displayHardware)
+    : _display(displayHardware), _painelDiagnostico(&displayHardware.getTftDriver()) {}
+
+void ScreenRenderer::iniciarMatrix() {
+    _painelDiagnostico.deleteSprite();
+    auto& tft = getDriver();
+    tft.fillScreen(TFT_BLACK);
+    for (auto& coluna : _matrix) {
+        coluna.cabeca = -random(1, 25);
+        coluna.comprimento = random(6, 16);
+        coluna.intervalo = random(1, 4);
+        coluna.passo = 0;
+    }
+    _ultimoMatrixTS = millis();
+}
+
+void ScreenRenderer::atualizarMatrix() {
+    if (millis() - _ultimoMatrixTS < 70) return;
+    _ultimoMatrixTS = millis();
+    auto& tft = getDriver();
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+    const char caracteres[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*";
+    const int linhas = SCREEN_H / 10;
+    tft.startWrite();
+    for (int i = 0; i < SCREEN_W / 8 && i < 40; ++i) {
+        auto& coluna = _matrix[i];
+        if (++coluna.passo < coluna.intervalo) continue;
+        coluna.passo = 0;
+        ++coluna.cabeca;
+        // Apaga somente a cauda: nenhuma limpeza completa durante a animacao.
+        int cauda = coluna.cabeca - coluna.comprimento;
+        if (cauda >= 0 && cauda < linhas) tft.fillRect(i * 8, cauda * 10, 8, 10, TFT_BLACK);
+        for (int distancia = 0; distancia < coluna.comprimento; ++distancia) {
+            int linha = coluna.cabeca - distancia;
+            if (linha < 0 || linha >= linhas) continue;
+            uint16_t cor = distancia == 0 ? 0xCFF9 : tft.color565(0, 220 - distancia * 12, 20);
+            tft.setTextColor(cor, TFT_BLACK);
+            char simbolo[2] = {caracteres[random(sizeof(caracteres) - 1)], 0};
+            tft.drawString(simbolo, i * 8, linha * 10);
+        }
+        if (cauda >= linhas) coluna.cabeca = -random(1, 15);
+    }
+    tft.endWrite();
+}
 
 void ScreenRenderer::limparPainelConteudo() {
+    _painelDiagnostico.deleteSprite();
     _display.getTftDriver().fillRect(0, 43, SCREEN_W, SCREEN_H - 43, TFT_BLACK);
 }
 
@@ -64,6 +112,130 @@ void ScreenRenderer::desenharMenuIps(const String& ipEscravo1, const String& ipE
     tft.drawRoundRect(LayoutDatabase::btnIp4X, LayoutDatabase::btnIp4Y, LayoutDatabase::btnIp4W, LayoutDatabase::btnIp4H, 4, TFT_WHITE);
     tft.setTextColor(esp4Online ? TFT_BLACK : TFT_WHITE);
     tft.drawString("ESP 4: " + udp.obterIpEscravo(4), LayoutDatabase::btnIp4X + (LayoutDatabase::btnIp4W / 2), LayoutDatabase::btnIp4Y + (LayoutDatabase::btnIp4H / 2));
+    tft.fillRoundRect(LayoutDatabase::btnDiagX, LayoutDatabase::btnDiagY, LayoutDatabase::btnDiagW, LayoutDatabase::btnDiagH, 6, TFT_DARKCYAN);
+    tft.drawRoundRect(LayoutDatabase::btnDiagX, LayoutDatabase::btnDiagY, LayoutDatabase::btnDiagW, LayoutDatabase::btnDiagH, 6, TFT_CYAN);
+    tft.setTextColor(TFT_WHITE); tft.setTextSize(2);
+    tft.drawString("Diagnosticos", SCREEN_W / 2, LayoutDatabase::btnDiagY + LayoutDatabase::btnDiagH / 2);
+}
+
+void ScreenRenderer::coletarSinalWifi() {
+    unsigned long agora = millis();
+    if (_totalAmostras && agora - _ultimaAmostraTS < 1000) return;
+    _ultimaAmostraTS = agora;
+    _historicoRSSI[_proximaAmostra] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127;
+    _proximaAmostra = (_proximaAmostra + 1) % 60;
+    if (_totalAmostras < 60) ++_totalAmostras;
+}
+
+void ScreenRenderer::desenharDiagnosticos(int pagina, bool atualizar) {
+    // Monta o quadro em memoria: o display recebe os pixels prontos,
+    // sem exibir a limpeza e cada etapa do desenho.
+    if (!_painelDiagnostico.created()) {
+        _painelDiagnostico.setColorDepth(8);
+        if (!_painelDiagnostico.createSprite(SCREEN_W, 145)) {
+            // Alternativa de baixo consumo de RAM para continuar navegando.
+            _painelDiagnostico.setColorDepth(1);
+            if (!_painelDiagnostico.createSprite(SCREEN_W, 145)) return;
+        }
+        _painelDiagnostico.setOrigin(0, -43);
+    }
+    TFT_eSprite& tft = _painelDiagnostico;
+    const char* titulos[] = {"DISPOSITIVO", "TEMPO / RELOGIO", "REDE WI-FI", "SINAL DA REDE", "CLIMA / PORTO ALEGRE", "CARTAO SD"};
+    tft.fillRect(0, 43, SCREEN_W, 145, TFT_BLACK);
+    tft.fillRoundRect(10, 48, 300, 25, 4, 0x10A2);
+    tft.setTextSize(1); tft.setTextColor(TFT_CYAN); tft.setTextDatum(MC_DATUM);
+    tft.drawString(String(titulos[pagina]) + "  " + String(pagina + 1) + "/6", 160, 60);
+    auto linha = [&](int y, String texto, uint16_t cor = TFT_WHITE) {
+        if (texto.length() > 48) texto = texto.substring(0, 45) + "...";
+        tft.setTextSize(1); tft.setTextDatum(TL_DATUM); tft.setTextColor(cor);
+        tft.drawString(texto, 16, y);
+    };
+    bool conectado = WiFi.status() == WL_CONNECTED;
+    if (pagina == 0) {
+        linha(82, String("Modelo: ") + ESP.getChipModel() + " / rev " + String(ESP.getChipRevision()));
+        linha(99, "CPU: " + String(ESP.getCpuFreqMHz()) + " MHz / " + String(ESP.getChipCores()) + " nucleos");
+        linha(116, "RAM livre: " + String(ESP.getFreeHeap() / 1024) + " KB");
+        linha(133, "RAM minima livre: " + String(ESP.getMinFreeHeap() / 1024) + " KB");
+        linha(150, "Flash: " + String(ESP.getFlashChipSize() / 1024 / 1024) + " MB / firmware " + String(ESP.getSketchSize() / 1024) + " KB");
+        linha(167, String("Build: ") + __DATE__ + " " + __TIME__);
+    } else if (pagina == 1) {
+        struct tm hora;
+        bool sincronizado = getLocalTime(&hora, 0);
+        char data[24] = "--/--/---- --:--:--";
+        if (sincronizado) strftime(data, sizeof(data), "%d/%m/%Y %H:%M:%S", &hora);
+        linha(82, sincronizado ? "NTP: SINCRONIZADO" : "NTP: AGUARDANDO", sincronizado ? TFT_GREEN : TFT_YELLOW);
+        tft.setTextDatum(MC_DATUM); tft.setTextSize(2); tft.setTextColor(TFT_WHITE);
+        tft.drawString(data, 160, 115);
+        unsigned long segundos = millis() / 1000;
+        char uptime[48];
+        snprintf(uptime, sizeof(uptime), "Ligado: %lud %02lu:%02lu:%02lu", segundos / 86400, segundos / 3600 % 24, segundos / 60 % 60, segundos % 60);
+        linha(146, uptime);
+        linha(166, "Fuso: " + String(getenv("TZ") ? getenv("TZ") : "--"));
+    } else if (pagina == 2) {
+        linha(80, conectado ? "Wi-Fi: CONECTADO" : "Wi-Fi: DESCONECTADO", conectado ? TFT_GREEN : TFT_RED);
+        linha(95, "SSID: " + WiFi.SSID());
+        linha(110, "IP: " + WiFi.localIP().toString() + "  Canal: " + String(WiFi.channel()));
+        linha(125, "Gateway: " + WiFi.gatewayIP().toString());
+        linha(140, "Mascara: " + WiFi.subnetMask().toString());
+        linha(155, "DNS: " + WiFi.dnsIP().toString());
+        linha(170, "MAC: " + WiFi.macAddress());
+    } else if (pagina == 3) {
+        int rssi = conectado ? WiFi.RSSI() : -127;
+        int qualidade = conectado ? constrain(2 * (rssi + 100), 0, 100) : 0;
+        uint16_t cor = rssi > -70 ? TFT_GREEN : rssi > -80 ? TFT_YELLOW : TFT_RED;
+        linha(79, conectado ? "RSSI: " + String(rssi) + " dBm / " + String(qualidade) + "% estimado" : "Sem conexao Wi-Fi", cor);
+        tft.drawRect(43, 98, 260, 67, TFT_DARKGREY);
+        linha(98, "-40", TFT_LIGHTGREY); linha(153, "-100", TFT_LIGHTGREY);
+        tft.drawFastHLine(44, 131, 258, 0x2103);
+        int primeiro = (_proximaAmostra + 60 - _totalAmostras) % 60;
+        for (int i = 1; i < _totalAmostras; ++i) {
+            int a = _historicoRSSI[(primeiro + i - 1) % 60];
+            int b = _historicoRSSI[(primeiro + i) % 60];
+            if (a == -127 || b == -127) continue;
+            tft.drawLine(44 + (i - 1) * 258 / 59, map(constrain(a, -100, -40), -100, -40, 163, 100),
+                         44 + i * 258 / 59, map(constrain(b, -100, -40), -100, -40, 163, 100), cor);
+        }
+        linha(174, "Historico: 60 amostras / 1 segundo", TFT_LIGHTGREY);
+    } else if (pagina == 4) {
+        auto clima = ClimaManager::snapshot();
+        if (!clima.sincronizado) {
+            linha(90, clima.ultimaFalhou ? "Falha na consulta. Tentando novamente..." : "Consultando clima de Porto Alegre...", TFT_YELLOW);
+            linha(115, conectado ? "Aguarde a primeira atualizacao." : "Aguardando conexao Wi-Fi.");
+        } else {
+            linha(80, ClimaManager::obterTextoCondicao(), TFT_CYAN);
+            linha(97, "Temperatura: " + String(clima.temperatura, 1) + " C / Umidade: " + String(clima.umidade) + "%");
+            if (clima.previsaoValida) {
+                linha(114, "Min: " + String(clima.minima, 1) + " C / Max: " + String(clima.maxima, 1) + " C");
+                linha(131, "Chance de chuva: " + String(clima.chuva) + "% / " + String(clima.data));
+            } else linha(114, "Previsao diaria indisponivel", TFT_YELLOW);
+            linha(148, "Atualizado ha " + String((millis() - clima.ultimaAtualizacao) / 60000) + " min", clima.ultimaFalhou ? TFT_YELLOW : TFT_GREEN);
+            linha(165, clima.ultimaFalhou ? "Falha ao atualizar: exibindo ultima leitura" : "Fonte: Open-Meteo / atualiza a cada 15 min", TFT_LIGHTGREY);
+        }
+    }
+    if (pagina == 5) {
+        auto sd = SdManager::snapshot();
+        linha(80, sd.pronto ? "SD: PRONTO / " + sd.tipo : "SD: INDISPONIVEL", sd.pronto ? TFT_GREEN : TFT_RED);
+        linha(95, "Capacidade: " + String(double(sd.capacidade) / (1024 * 1024 * 1024), 2) + " GB");
+        linha(110, "Usado: " + String(double(sd.usado) / (1024 * 1024), 1) + " MB / livre: " + String(double(sd.total >= sd.usado ? sd.total - sd.usado : 0) / (1024 * 1024), 1) + " MB");
+        linha(125, "SPI: " + String(sd.frequencia / 1000) + " kHz / CS5 CLK18 MISO19 MOSI23");
+        linha(140, "/log.txt: " + String(sd.tamanhoLog / 1024.0, 1) + " KB / registros: " + String(sd.registros));
+        linha(155, "Falhas de log: " + String(sd.falhasLog), sd.falhasLog ? TFT_YELLOW : TFT_WHITE);
+        linha(170, sd.erro.length() ? sd.erro : "Log ativo / informacoes a cada 30s", sd.erro.length() ? TFT_YELLOW : TFT_LIGHTGREY);
+    }
+    _painelDiagnostico.pushSprite(0, 43);
+    // Botoes e rodape sao fixos; so redesenha ao abrir ou trocar de pagina.
+    if (atualizar) return;
+    TFT_eSPI& display = _display.getTftDriver();
+    const int xs[] = {10, 110, 220};
+    const int ws[] = {90, 100, 90};
+    const char* labels[] = {"< ANTERIOR", "MENU", "PROXIMA >"};
+    for (int i = 0; i < 3; ++i) {
+        display.fillRoundRect(xs[i], 190, ws[i], 26, 4, i == 1 ? TFT_DARKCYAN : 0x3186);
+        display.drawRoundRect(xs[i], 190, ws[i], 26, 4, TFT_WHITE);
+        display.setTextDatum(MC_DATUM); display.setTextSize(1); display.setTextColor(TFT_WHITE);
+        display.drawString(labels[i], xs[i] + ws[i] / 2, 203);
+    }
+    desenharRodape("Sem toque por 30s: volta ao menu", TFT_LIGHTGREY);
 }
 
 void ScreenRenderer::desenharPainelPaginas(int modo, int escravoAlvo, int paginaAtual, const String& ip1, const String& ip2, const String& status) {

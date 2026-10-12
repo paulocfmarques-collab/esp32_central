@@ -128,7 +128,7 @@ public:
     static void inicializarHardware();
     static String obterMotivoReset();
     static void gerenciarBlinkAsync();
-    static void executar(const String& cmdBruto, bool requisicaoRemotaUdp = false);
+    static void executar(const String& cmdBruto, bool requisicaoRemotaUdp = false, const char* origem = "tela");
 };
 
 #endif

@@ -7,7 +7,8 @@
 
 class InterfaceCentral {
 public:
-    enum Modo { MODO_INICIAL = 0, MODO_LOCAL = 1, MODO_REMOTO = 2 };
+    enum Modo { MODO_INICIAL = 0, MODO_LOCAL = 1, MODO_REMOTO = 2, MODO_DIAGNOSTICOS = 3 };
+    static constexpr int TOTAL_DIAGNOSTICOS = 6;
     
     bool otaGravando;
 
@@ -21,6 +22,7 @@ public:
     void acumularMensagemResposta(String msg);
     void atualizarRelogioDinamico();
     void atualizarIndicadorWifi();
+    void atualizarDiagnosticos();
     void checarAutoFechamento();
     void imprimirRodape(String msg, uint16_t cor);
     const char* escanearToque();
@@ -36,6 +38,7 @@ public:
     ScreenRenderer _renderer; 
 
 private:
+    unsigned long _ultimoDiagnosticoTS = 0;
     TouchDriver _touch;
     Modo _modoOperacao;
     int _escravoAtivoAlvo; 

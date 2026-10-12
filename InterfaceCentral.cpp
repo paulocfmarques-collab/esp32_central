@@ -20,10 +20,12 @@ void InterfaceCentral::inicializar() {
     _touch.inicializar();
 }
 int InterfaceCentral::obterTotalPaginasDoModo() const {
+    if (_modoOperacao == MODO_DIAGNOSTICOS) return TOTAL_DIAGNOSTICOS;
     return (_modoOperacao == MODO_INICIAL) ? 0 : 5;
 }
 
 void InterfaceCentral::renderizarTela() {
+    if (_protecaoTelaAtiva) return;
     _modoRespostaAtivo = false;
     
     // Solicita o controle do barramento de pixels de forma segura
@@ -37,6 +39,8 @@ void InterfaceCentral::renderizarTela() {
 
         if (_modoOperacao == MODO_INICIAL) {
             _renderer.desenharMenuIps(udp.obterIpEscravo(1), udp.obterIpEscravo(2));
+        } else if (_modoOperacao == MODO_DIAGNOSTICOS) {
+            _renderer.desenharDiagnosticos(_paginaAtual);
         } else {
             _renderer.desenharPainelPaginas((int)_modoOperacao, _escravoAtivoAlvo, _paginaAtual, udp.obterIpEscravo(1), udp.obterIpEscravo(2), _statusAtual);
         }
@@ -119,6 +123,13 @@ const char* InterfaceCentral::escanearToque() {
 
     // ─── MAPEAMENTO INTEGRADO DA GRADE DE 4 IPS ───
     if (_modoOperacao == MODO_INICIAL) {
+        if (x >= LayoutDatabase::btnDiagX && x < LayoutDatabase::btnDiagX + LayoutDatabase::btnDiagW &&
+            y >= LayoutDatabase::btnDiagY && y < LayoutDatabase::btnDiagY + LayoutDatabase::btnDiagH) {
+            udp.resetarEspera();
+            _modoOperacao = MODO_DIAGNOSTICOS; _paginaAtual = 0; _escravoAtivoAlvo = 0;
+            renderizarTela();
+            return nullptr;
+        }
         if (x >= LayoutDatabase::btnLocalX && x <= (LayoutDatabase::btnLocalX + LayoutDatabase::btnLocalW) && 
             y >= LayoutDatabase::btnLocalY && y <= (LayoutDatabase::btnLocalY + LayoutDatabase::btnLocalH)) {
             _modoOperacao = MODO_LOCAL; _escravoAtivoAlvo = 0; _paginaAtual = 0; 
@@ -148,6 +159,17 @@ const char* InterfaceCentral::escanearToque() {
             _modoOperacao = MODO_REMOTO; _escravoAtivoAlvo = 4; _paginaAtual = 0; 
             _statusAtual = "Controle UDP -> ESP 4"; renderizarTela(); 
             return nullptr;
+        }
+        return nullptr;
+    }
+
+    if (_modoOperacao == MODO_DIAGNOSTICOS) {
+        if (y >= 190 && y < 216) {
+            if (x >= 10 && x < 100) _paginaAtual = (_paginaAtual + TOTAL_DIAGNOSTICOS - 1) % TOTAL_DIAGNOSTICOS;
+            else if (x >= 110 && x < 210) { _modoOperacao = MODO_INICIAL; _paginaAtual = 0; }
+            else if (x >= 220 && x < 310) _paginaAtual = (_paginaAtual + 1) % TOTAL_DIAGNOSTICOS;
+            else return nullptr;
+            renderizarTela();
         }
         return nullptr;
     }
@@ -195,6 +217,7 @@ const char* InterfaceCentral::escanearToque() {
 }
 
 void InterfaceCentral::exibirTelaResposta(String msg) {
+    if (_protecaoTelaAtiva) return;
     _modoRespostaAtivo = true; 
     _tempoAberturaRespostaTS = millis();
     _scrollOffsetLinhas = 0;
@@ -208,6 +231,9 @@ void InterfaceCentral::exibirTelaResposta(String msg) {
 }
 
 void InterfaceCentral::acumularMensagemResposta(String msg) {
+    if (_protecaoTelaAtiva) return;
+    // Respostas atrasadas dos ESPs nao devem cobrir as paginas de diagnostico.
+    if (_modoOperacao == MODO_DIAGNOSTICOS) return;
     _tempoAberturaRespostaTS = millis();
     
     // Se a tela de resposta não estava aberta, inicia um buffer totalmente fresco
@@ -226,6 +252,7 @@ void InterfaceCentral::acumularMensagemResposta(String msg) {
 }
 
 void InterfaceCentral::atualizarRelogioDinamico() { 
+    if (_protecaoTelaAtiva) return;
     if (mutexSPI != NULL && xSemaphoreTake(mutexSPI, pdMS_TO_TICKS(5)) == pdTRUE) {
         _renderer.atualizarRelogio(_ultimoRelogioTS); 
         xSemaphoreGive(mutexSPI);
@@ -233,44 +260,56 @@ void InterfaceCentral::atualizarRelogioDinamico() {
 }
 
 void InterfaceCentral::atualizarIndicadorWifi() { 
+    if (_protecaoTelaAtiva) return;
     if (mutexSPI != NULL && xSemaphoreTake(mutexSPI, pdMS_TO_TICKS(5)) == pdTRUE) {
         _renderer.atualizarSinalWifi(_ultimoWifiTS); 
         xSemaphoreGive(mutexSPI);
     }
 }
 
+void InterfaceCentral::atualizarDiagnosticos() {
+    if (otaGravando) return;
+    _renderer.coletarSinalWifi();
+    if (_modoOperacao != MODO_DIAGNOSTICOS || _modoRespostaAtivo || _protecaoTelaAtiva ||
+        millis() - _ultimoDiagnosticoTS < 1000) return;
+    if (mutexSPI != NULL && xSemaphoreTake(mutexSPI, pdMS_TO_TICKS(5)) == pdTRUE) {
+        _ultimoDiagnosticoTS = millis();
+        _renderer.desenharDiagnosticos(_paginaAtual, true);
+        xSemaphoreGive(mutexSPI);
+    }
+}
+
 void InterfaceCentral::checarAutoFechamento() { 
+    if (_modoOperacao == MODO_DIAGNOSTICOS && !_protecaoTelaAtiva && !otaGravando &&
+        millis() - _ultimoToqueAtividadeTS >= 30000) {
+        _modoOperacao = MODO_INICIAL;
+        _paginaAtual = 0;
+        _escravoAtivoAlvo = 0;
+        _statusAtual = "Selecione o destino de operacao...";
+        udp.resetarEspera();
+        renderizarTela();
+    }
     if (_modoRespostaAtivo && (millis() - _tempoAberturaRespostaTS >= AUTO_CLOSE_MS)) { 
         renderizarTela(); 
     } 
     
     unsigned long tempoInativo = millis() - _ultimoToqueAtividadeTS;
 
-    // 🔥 PRE-AVISO AMRELO: Faltando 10 segundos (290 milissegundos inativo) avisa no rodapé
-    if (!_protecaoTelaAtiva && _modoOperacao != MODO_INICIAL && tempoInativo >= 290000 && tempoInativo < TIMEOUT_PROTECAO_MS) {
-        static unsigned long ultimoBlinkRodape = 0;
-        static bool inverterCorAviso = false;
-        
-        if (millis() - ultimoBlinkRodape >= 1000) {
-            ultimoBlinkRodape = millis();
-            inverterCorAviso = !inverterCorAviso;
-            imprimirRodape("[ TELA ENTRANDO EM MODO DE DESCANSO... ]", inverterCorAviso ? TFT_YELLOW : TFT_RED);
-        }
-    }
-    
-    // Desligamento total ao atingir 5 minutos
+    if (otaGravando) return;
     if (!_protecaoTelaAtiva && !otaGravando && tempoInativo >= TIMEOUT_PROTECAO_MS) {
-        _protecaoTelaAtiva = true;
-        
         if (mutexSPI != NULL && xSemaphoreTake(mutexSPI, pdMS_TO_TICKS(10)) == pdTRUE) {
-            _renderer.limparPainelConteudo();
-            _renderer.getDriver().fillScreen(TFT_BLACK);
+            _modoRespostaAtivo = false;
+            _renderer.iniciarMatrix();
+            _protecaoTelaAtiva = true;
+            digitalWrite(21, HIGH);
             xSemaphoreGive(mutexSPI);
         }
-        digitalWrite(21, LOW); 
-        Serial.println(F("[Sistema] Protecao de tela ativa por inatividade (5 min)."));
+    }
+    if (_protecaoTelaAtiva && mutexSPI != NULL && xSemaphoreTake(mutexSPI, pdMS_TO_TICKS(5)) == pdTRUE) {
+        _renderer.atualizarMatrix();
+        xSemaphoreGive(mutexSPI);
     }
 }
 
-void InterfaceCentral::imprimirRodape(String msg, uint16_t cor) { _renderer.desenharRodape(msg, cor); }
+void InterfaceCentral::imprimirRodape(String msg, uint16_t cor) { if (!_protecaoTelaAtiva) _renderer.desenharRodape(msg, cor); }
 void InterfaceCentral::desligarDisplayFisico() { _renderer.limparPainelConteudo(); digitalWrite(21, LOW); }

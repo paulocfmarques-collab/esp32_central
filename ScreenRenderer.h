@@ -19,9 +19,21 @@ public:
     void atualizarRelogio(unsigned long& ultimoTimestamp);
     void atualizarSinalWifi(unsigned long& ultimoTimestamp);
     void desenharRodape(const String& msg, uint16_t cor);
+    void desenharDiagnosticos(int pagina, bool atualizar = false);
+    void coletarSinalWifi();
+    void iniciarMatrix();
+    void atualizarMatrix();
 
 private:
+    struct ColunaMatrix { int cabeca; uint8_t comprimento; uint8_t intervalo; uint8_t passo; };
+    ColunaMatrix _matrix[40] = {};
+    unsigned long _ultimoMatrixTS = 0;
+    int _historicoRSSI[60] = {};
+    int _proximaAmostra = 0;
+    int _totalAmostras = 0;
+    unsigned long _ultimaAmostraTS = 0;
     Display& _display;
+    TFT_eSprite _painelDiagnostico;
 };
 
 #endif

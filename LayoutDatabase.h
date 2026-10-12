@@ -28,6 +28,7 @@ public:
     static constexpr int btnIp3X   = 15,  btnIp3Y   = 135, btnIp3W = 140, btnIp3H = 28; 
     static constexpr int btnIp4X   = 165, btnIp4Y   = 135, btnIp4W = 140, btnIp4H = 28; 
     static constexpr int btnProxX  = 15,  btnProxY  = 190, btnProxW  = 290, btnProxH  = 26;
+    static constexpr int btnDiagX = 50, btnDiagY = 175, btnDiagW = 220, btnDiagH = 38;
 };
 
 #endif

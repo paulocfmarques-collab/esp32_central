@@ -1,4 +1,5 @@
 #include "UdpComm.h"
+#include "SdManager.h"
 
 UdpComm::UdpComm(int porta) 
   : _porta(porta), _tempoEnvio(0), _aguardandoResposta(false) {}
@@ -29,10 +30,17 @@ void UdpComm::enviarComando(const char* cmd, int numeroEscravo) {
     
     _udp.beginPacket(targetIP, _porta);
     _udp.print(cmd);
-    _udp.endPacket();
+    bool enviado = _udp.endPacket() == 1;
+    SdManager::registrar(enviado ? "COMANDO_TX" : "FALHA_TX", "udp:ESP" + String(numeroEscravo) + ":" + destinoStr, cmd);
+    Serial.print(F("[ESP TX "));
+    Serial.print(numeroEscravo);
+    Serial.print(F("] "));
+    Serial.println(cmd);
     
     _tempoEnvio = millis();
-    _aguardandoResposta = true;
+    _aguardandoResposta = enviado;
+  } else {
+    SdManager::registrar("FALHA_TX", "udp:ESP" + String(numeroEscravo), "IP invalido / comando: " + String(cmd));
   }
 }
 
@@ -95,7 +103,10 @@ String UdpComm::obterIpEscravo(int numeroEscravo) const {
 }
 
 void UdpComm::responderRemoto(const String& msg) {
-  _udp.beginPacket(_udp.remoteIP(), _udp.remotePort());
+  IPAddress destino = _udp.remoteIP();
+  uint16_t porta = _udp.remotePort();
+  _udp.beginPacket(destino, porta);
   _udp.print(msg + "\n");
-  _udp.endPacket();
+  bool enviado = _udp.endPacket() == 1;
+  SdManager::registrar(enviado ? "RESPOSTA_TX" : "FALHA_TX", "udp:" + destino.toString() + ":" + String(porta), msg);
 }

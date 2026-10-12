@@ -53,7 +53,8 @@
 | `docs/screenshots/config-ap.png` | Access point configuration portal |
 | `docs/demo/demo.gif` | Short interaction demo |
 
-**Demo video:** `https://your-demo-link-here`
+> [!NOTE]
+> Demo link and real screenshots are pending publication in this repository.
 
 ---
 
@@ -66,12 +67,6 @@
 | Touchscreen-driven UX | UDP command routing | Portfolio-friendly presentation |
 
 </div>
-
-> [!TIP]
-> A strong README should answer three questions immediately: what it does, how it works, and why it is impressive.
-
-> [!NOTE]
-> The sections below are organized like a product landing page: value proposition first, then proof, then setup.
 
 ---
 
@@ -166,53 +161,57 @@ cd esp32_central
 
 ### Local commands
 
-- `help`
-- `info`
-- `status`
-- `reason`
-- `version`
-- `build`
-- `cpu`
-- `ram`
-- `flash`
-- `temp`
-- `psram`
-- `mac`
-- `net_info`
-- `time`
-- `date`
-- `led_on`
-- `led_off`
-- `led_blink:500`
-- `set_escravo1:IP`
-- `set_escravo2:IP`
-- `set_escravo3:IP`
-- `set_escravo4:IP`
-- `set_fuso:-3`
-- `scan`
-- `reset_wifi`
-- `desligar`
-- `lastcmd`
-- `cmdcount`
-- `vago`
+| Command | Description |
+| --- | --- |
+| `help` | Shows available local commands |
+| `info` | Displays firmware and board summary |
+| `status` | Displays system status |
+| `reason` | Shows last reset reason |
+| `version` | Shows firmware version |
+| `build` | Shows build metadata |
+| `cpu` | Shows CPU information |
+| `ram` | Shows memory usage |
+| `flash` | Shows flash usage |
+| `temp` | Shows chip temperature |
+| `psram` | Shows PSRAM info |
+| `mac` | Shows MAC address |
+| `net_info` | Shows network information |
+| `time` | Shows current time |
+| `date` | Shows current date |
+| `led_on` | Turns on status LED |
+| `led_off` | Turns off status LED |
+| `led_blink:500` | Blinks status LED with interval |
+| `set_escravo1:IP` | Sets slave 1 IP |
+| `set_escravo2:IP` | Sets slave 2 IP |
+| `set_escravo3:IP` | Sets slave 3 IP |
+| `set_escravo4:IP` | Sets slave 4 IP |
+| `set_fuso:-3` | Sets timezone offset |
+| `scan` | Scans Wi-Fi networks |
+| `reset_wifi` | Clears Wi-Fi config |
+| `desligar` | Triggers shutdown routine |
+| `lastcmd` | Shows last command |
+| `cmdcount` | Shows command counter |
+| `vago` | Reserved/diagnostic command |
 
 ### Remote commands via UDP
 
-- `LED_ON`
-- `LED_OFF`
-- `LED_BLINK:1000`
-- `TEMP`
-- `CPU`
-- `RAM`
-- `FLASH`
-- `INFO`
-- `STATUS`
-- `VERSION`
-- `UPTIME`
-- `NET_INFO`
-- `TIME`
-- `DATE`
-- `alive`
+| Command | Description |
+| --- | --- |
+| `LED_ON` | Turns on remote LED |
+| `LED_OFF` | Turns off remote LED |
+| `LED_BLINK:1000` | Blinks remote LED |
+| `TEMP` | Returns remote temperature |
+| `CPU` | Returns remote CPU info |
+| `RAM` | Returns remote RAM info |
+| `FLASH` | Returns remote flash info |
+| `INFO` | Returns remote firmware summary |
+| `STATUS` | Returns remote system status |
+| `VERSION` | Returns remote firmware version |
+| `UPTIME` | Returns remote uptime |
+| `NET_INFO` | Returns remote network info |
+| `TIME` | Returns remote current time |
+| `DATE` | Returns remote current date |
+| `alive` | Returns liveness/heartbeat response |
 
 ---
 
@@ -245,12 +244,26 @@ The status LED can blink without blocking the main loop.
 
 ---
 
+## Versioning and Releases
+
+- Current workflow uses `main` as the integration branch.
+- Recommended release pattern: `vMAJOR.MINOR.PATCH` (example: `v1.0.1`).
+- Create annotated tags for each production-ready firmware baseline.
+- Register each release with summary notes and compatibility details.
+
+Quick commands:
+
+```bash
+git tag -a v1.0.1 -m "Release v1.0.1"
+git push origin v1.0.1
+```
+
+---
+
 ## License
 
-> [!TIP]
-> This project is released under a permissive open-source license that supports portfolio use, reuse, and contribution.
-
-This repository is licensed under the [MIT License](./LICENSE). You are free to use, modify, and redistribute the project under the terms described in the license file.
+No `LICENSE` file is currently present in this repository.
+If you want to publish as open-source, add a license file (for example, MIT) and update this section accordingly.
 
 ---
 

@@ -5,10 +5,12 @@
 #include <WebServer.h>
 #include <Preferences.h>
 #include "Display.h"
+#include "MetricsService.h"
 
 class WifiConfig {
 private:
   WebServer _server;
+  MetricsService _metrics;
   Preferences _prefs;
   Display& _display;
   

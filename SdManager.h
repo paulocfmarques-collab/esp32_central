@@ -10,6 +10,12 @@ struct SdSnapshot {
     uint32_t frequencia = 0, registros = 0, falhasLog = 0, tamanhoLog = 0;
 };
 
+struct SdMetricsSnapshot {
+    bool pronto = false;
+    uint64_t capacidade = 0, total = 0, usado = 0;
+    uint32_t frequencia = 0, registros = 0, falhasLog = 0, tamanhoLog = 0;
+};
+
 class SdManager {
 public:
     static constexpr int CLK = 18, MISO = 19, MOSI = 23, CS = 5;
@@ -27,7 +33,11 @@ public:
     static void inicializar();
     static void processar();
     static SdSnapshot snapshot();
+    static bool snapshotMetricas(SdMetricsSnapshot& out);
     static void atualizarEstatisticas(); // somente dentro de Acesso
     static void registrar(const char* evento, const String& origem, const String& texto);
+    // Guarda poucas mensagens anteriores a montagem, sem acesso prematuro ao SPI.
+    static void registrarInicializacao(const String& texto);
+    static bool salvarCrash(const String& relatorio, String& caminho, String& erro);
     static void falha(const String& erro);
 };

@@ -1,5 +1,19 @@
 # Comandos pela serial USB
 
+## Monitoramento pela rede
+
+A integracao Prometheus e configurada pela pagina `/prometheus` do painel,
+sempre na **porta 80**, nao por um novo comando serial. Endereco do servidor,
+porta de metricas e intervalo sugerido persistem nas Preferences `telemetry`.
+O Prometheus coleta `/metrics` na porta configurada (padrao **9120**).
+Baixe o YAML da pagina e aplique no servidor; nao ha envio ativo.
+
+Os avisos `[METRICS]` na serial identificam porta ativa e problemas de NVS
+ou disponibilidade de CPU. Os contadores de aplicacao medem HTTP, nao comandos
+serial/UDP. As metricas do SD podem ser comparadas com `sd_status` e `sd_log`;
+`temp` consulta a mesma fonte da temperatura interna exportada.
+Veja [PROMETHEUS.md](PROMETHEUS.md) para nomes, limites e testes.
+
 Abra o Monitor Serial em **115200 baud** e selecione nova linha, retorno de
 carro ou ambos. Envie um comando por linha, por exemplo:
 

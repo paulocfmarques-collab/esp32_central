@@ -5,11 +5,19 @@
 #include "ScreenRenderer.h"
 #include "LayoutDatabase.h"
 
-class InterfaceCentral {
-public:
-    enum Modo { MODO_INICIAL = 0, MODO_LOCAL = 1, MODO_REMOTO = 2, MODO_DIAGNOSTICOS = 3 };
+class InterfaceCentral
+{
+  public:
+    enum Modo
+    {
+        MODO_INICIAL = 0,
+        MODO_LOCAL = 1,
+        MODO_REMOTO = 2,
+        MODO_DIAGNOSTICOS = 3
+    };
+
     static constexpr int TOTAL_DIAGNOSTICOS = 6;
-    
+
     bool otaGravando;
 
     // Controle de temporização da varredura
@@ -29,37 +37,52 @@ public:
     void desligarDisplayFisico();
 
     int obterTotalPaginasDoModo() const;
-    int obterModoOperacao() const { return (int)_modoOperacao; }
-    int obterEscravoAtivoAlvo() const { return _escravoAtivoAlvo; }
 
-    bool isEscravo1Ativo() const { return _escravoAtivoAlvo == 1; }
-    bool isEscravo2Ativo() const { return _escravoAtivoAlvo == 2; }
+    int obterModoOperacao() const
+    {
+        return (int)_modoOperacao;
+    }
 
-    ScreenRenderer _renderer; 
+    int obterEscravoAtivoAlvo() const
+    {
+        return _escravoAtivoAlvo;
+    }
 
-private:
+    bool isEscravo1Ativo() const
+    {
+        return _escravoAtivoAlvo == 1;
+    }
+
+    bool isEscravo2Ativo() const
+    {
+        return _escravoAtivoAlvo == 2;
+    }
+
+    ScreenRenderer _renderer;
+
+  private:
     unsigned long _ultimoDiagnosticoTS = 0;
     TouchDriver _touch;
     Modo _modoOperacao;
-    int _escravoAtivoAlvo; 
+    int _escravoAtivoAlvo;
     int _paginaAtual;
     bool _modoRespostaAtivo;
     int _yTerminalDinamic;
-    
+
     unsigned long _ultimoRelogioTS;
     unsigned long _ultimoWifiTS;
     unsigned long _tempoAberturaRespostaTS;
     String _statusAtual;
-    
-    unsigned long _ultimoToqueAtividadeTS; 
-    bool _protecaoTelaAtiva;              
+
+    unsigned long _ultimoToqueAtividadeTS;
+    bool _protecaoTelaAtiva;
     const unsigned long TIMEOUT_PROTECAO_MS = 300000; // 5 minutos
-    
-    int _scrollOffsetLinhas;      // Quantas linhas rolamos para cima/baixo
+
+    int _scrollOffsetLinhas;          // Quantas linhas rolamos para cima/baixo
     String _mensagemRespostaCompleta; // Armazena o texto inteiro para repintar no Scroll
     const int AUTO_CLOSE_MS = 30000;
-    
+
     friend class OtaManager;
-}; 
+};
 
 #endif

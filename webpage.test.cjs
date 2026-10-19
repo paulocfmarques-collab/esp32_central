@@ -2,6 +2,10 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert/strict');
 const html = fs.readFileSync(__dirname + '/WebPage.h', 'utf8');
+assert.match(html, /href="\/prometheus"/);
+const gzipSource = fs.readFileSync(__dirname + '/WebPageGzip.h', 'utf8');
+const compressed = Buffer.from([...gzipSource.matchAll(/0x([0-9a-f]{2})/g)].map(m => parseInt(m[1], 16)));
+assert.equal(require('zlib').gunzipSync(compressed).toString('utf8'), html.split('R"rawliteral(')[1].split(')rawliteral"')[0]);
 const script = html.split('<script>')[1].split('</script>')[0];
 const elements = new Map();
 function element(id='') {

@@ -175,6 +175,7 @@ bool WifiConfig::tentarConectar(const String& ssid, const String& senha) {
 }
 
 bool WifiConfig::conectar() {
+  _metrics.begin(_server);
   _prefs.begin("wifi", false);
   // Migra a rede unica antiga para o slot 0
   if (_prefs.getString("s0", "") == "" && _prefs.getString("ssid", "") != "") {
@@ -193,9 +194,18 @@ bool WifiConfig::conectar() {
 
   if (!temRede) return false;
 
-  WiFi.mode(WIFI_AP_STA);
+  // Conectar ao roteador nao precisa alocar simultaneamente um SoftAP.
+  // iniciarPortal() ativa WIFI_AP separadamente se nenhuma rede conectar.
+  WiFi.mode(WIFI_STA);
   _display.mostrarMensagemCentral("Buscando redes...");
   int n = WiFi.scanNetworks();
+  bool visiveis[MAX_REDES] = {};
+  for (int i = 0; i < MAX_REDES; ++i)
+    for (int j = 0; j < n; ++j)
+      if (ssids[i].length() && WiFi.SSID(j) == ssids[i]) visiveis[i] = true;
+  // Liberar todos os resultados ANTES da associacao: a coexistencia com
+  // A rede ainda precisa alocar temporizadores e buffers nesse momento.
+  WiFi.scanDelete();
 
   // Lista circular: comeca na rede seguinte a ultima usada
   bool conectado = false;
@@ -203,11 +213,8 @@ bool WifiConfig::conectar() {
     int i = (ultimo + k + MAX_REDES) % MAX_REDES;
     if (ssids[i] == "") continue;
 
-    bool visivel = false;
-    for (int j = 0; j < n; j++) {
-      if (WiFi.SSID(j) == ssids[i]) { visivel = true; break; }
-    }
-    if (!visivel) continue;
+    // Se o scan falhar, tentar as redes salvas em vez de abrir AP imediatamente.
+    if (n >= 0 && !visiveis[i]) continue;
 
     if (tentarConectar(ssids[i], senhas[i])) {
       _prefs.begin("wifi", false);
@@ -216,7 +223,6 @@ bool WifiConfig::conectar() {
       conectado = true;
     }
   }
-  WiFi.scanDelete();
 
   if (conectado) {
       _server.on("/", HTTP_GET, WifiConfig::handleRootCallback);
@@ -225,6 +231,7 @@ bool WifiConfig::conectar() {
       _server.on("/api/info", HTTP_GET, WifiConfig::handleInfoApiCallback);
       _server.on("/api/log", HTTP_GET, WifiConfig::handleLogCallback);
       _server.begin();
+      _metrics.start();
       return true;
   }
   return false;
@@ -248,10 +255,12 @@ void WifiConfig::iniciarPortal() {
   _server.on("/api/info", HTTP_GET, WifiConfig::handleInfoApiCallback);
   _server.on("/api/log", HTTP_GET, WifiConfig::handleLogCallback);
   _server.begin();
+  _metrics.start();
 }
 
 void WifiConfig::processarPortal() {
   _server.handleClient();
+  _metrics.process();
   
   if (_dadosProntosParaSalvar) {
     _dadosProntosParaSalvar = false;

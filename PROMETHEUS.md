@@ -169,6 +169,45 @@ locais. Estas 17 series dependem de hardware/configuracao e instrumentacao:
 | ADC | `gpio_analog_value` | Pino e escala calibrada, sem conflito com os perifericos. |
 | MQTT | `mqtt_connected`, `mqtt_messages_sent`, `mqtt_messages_received`, `mqtt_publish_errors` | Cliente MQTT e callbacks de conexao, publicacao e recepcao. |
 
+## Diagnostico de lentidao e memoria
+
+O comando `metrics_diag` informa porta, envios completos/falhos, resultado e
+duracao da ultima tentativa, RAM interna de 8 bits disponivel antes do envio,
+maior bloco utilizavel, estado do Matrix, tarefa de rede e fila de comandos.
+Ele nao reinicia a placa nem apaga contadores. `ram` tambem mostra os valores
+de 8 bits: a RAM interna total informada por ESP.getFreeHeap pode incluir
+regioes de 32 bits que nao atendem uma alocacao de String.
+
+A exposicao usa HTTP chunked com um buffer fixo de 512 bytes, sem reservar
+um String com o documento inteiro. O WebServer escreve o bloco final zero.
+As series novas permitem acompanhar a memoria e correlacionar o Matrix:
+
+- `esp_heap_8bit_free_bytes`
+- `esp_heap_8bit_largest_free_block_bytes`
+- `esp_metrics_exports_total`
+- `esp_metrics_export_errors_total`
+- `esp_screensaver_active`
+
+Depois de gravar, compare `/metrics` com Matrix ativo/inativo e execute
+`metrics_diag` durante uma falha, antes de reiniciar. A correcao de alocacao
+nao confirma por si so a causa de qualquer bloqueio prolongado no loop.
+
+## Monitoramento UDP
+
+As metricas UDP usam o mesmo rotulo `device` das demais series:
+
+| Metrica | Tipo | Significado |
+| --- | --- | --- |
+| `esp_udp_listener_up` | gauge | 1 se a abertura da porta UDP funcionou e o Wi-Fi esta conectado; 0 caso contrario. |
+| `esp_udp_packets_received_total` | counter | Datagramas identificados por `parsePacket`, incluindo comandos externos e respostas dos ESPs. |
+| `esp_udp_replies_sent_total` | counter | Respostas a comandos externos cujo envio local terminou com sucesso. |
+| `esp_udp_send_errors_total` | counter | Falhas ao enviar comandos ou respostas: IP invalido, inicio do pacote, escrita incompleta ou finalizacao. |
+
+Os contadores sao de 64 bits, protegidos entre nucleos, acumulam desde o boot
+e permanecem ao reabrir o socket/reconectar. Zere-os somente reiniciando a
+Central. Sucesso no envio UDP confirma a entrega ao socket local; nao e uma
+confirmacao do destinatario.
+
 ## Compilacao e verificacao na placa
 
 Mantenha `build_opt.h` junto ao sketch, ESP32 Dev Module, PSRAM desativada e

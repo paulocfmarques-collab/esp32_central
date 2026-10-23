@@ -2,6 +2,35 @@
 #include "CommandHandler.h"
 #include "ClimaManager.h"
 #include "SdManager.h"
+#include "UdpComm.h"
+#include "MetricsChunkStream.h"
+#include <esp_heap_caps.h>
+
+extern UdpComm udp;
+extern QueueHandle_t filaMensagens;
+extern TaskHandle_t TaskCore0;
+
+String MetricsService::diagnostico() {
+    if (!instance) return "Servico de metricas ainda nao inicializado.\n";
+    auto& service = *instance;
+    const uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+    String out = "DIAGNOSTICO DE METRICAS\nPorta: " + String(service.activePort);
+    out += "\nExportacoes OK: " + String(service.exportsOk);
+    out += "\nExportacoes com falha: " + String(service.exportsFailed);
+    if (service.exportsOk || service.exportsFailed) {
+        out += "\nUltima tentativa: " + String((millis() - service.lastExportAt) / 1000) + " s atras";
+        out += "\nUltimo resultado: " + String(service.lastExportFailed ? "FALHA" : "OK");
+        out += "\nDuracao: " + String(service.lastExportDurationMs) + " ms";
+        out += "\nRAM 8 bits antes da tentativa: " + String(service.lastFree8) + " bytes";
+        out += "\nMaior bloco antes da tentativa: " + String(service.lastLargest8) + " bytes";
+    }
+    out += "\nRAM 8 bits livre agora: " + String(heap_caps_get_free_size(caps)) + " bytes";
+    out += "\nMaior bloco 8 bits agora: " + String(heap_caps_get_largest_free_block(caps)) + " bytes";
+    out += "\nMatrix: " + String(central.protecaoTelaAtiva() ? "ATIVO" : "INATIVO");
+    out += "\nTarefa de rede criada: " + String(TaskCore0 ? "SIM" : "NAO");
+    out += "\nFila de comandos: " + String(filaMensagens ? uxQueueMessagesWaiting(filaMensagens) : 0) + "\n";
+    return out;
+}
 
 bool MetricsService::validHost(const String& host) {
     if (host.isEmpty() || host.length() > 253) return false;
@@ -43,6 +72,7 @@ String MetricsService::escapeHtml(String value) {
 }
 
 void MetricsService::begin(WebServer& web) {
+    instance = this;
     panel = &web;
     pinMode(0, INPUT_PULLUP);
     config.version = 1; config.port = 9120; config.interval = 15;
@@ -232,48 +262,43 @@ void MetricsService::sampleCpu() {
 }
 
 void MetricsService::sendMetrics(WebServer& web) {
-    String body = exposition();
+    uint32_t started = millis();
+    lastExportAt = started;
+    lastFree8 = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    lastLargest8 = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     web.sendHeader("Cache-Control", "no-store");
-    if (body.isEmpty()) {
-        web.send(503, "text/plain; charset=utf-8", "Sem memoria para gerar metricas.\n");
+    if (lastFree8 < 1024 || lastLargest8 < 512) {
+        ++exportsFailed;
+        lastExportFailed = true;
+        web.send(503, "text/plain; charset=utf-8", "Memoria de 8 bits insuficiente para metricas.\n");
+        lastExportDurationMs = millis() - started;
         return;
     }
-    // Uma escrita unica de varios KB pode esgotar os buffers TCP/Wi-Fi.
-    // Anunciar o tamanho final e limitar cada escrita, sem HTTP chunked.
-    web.setContentLength(body.length());
+    web.setContentLength(CONTENT_LENGTH_UNKNOWN);
     web.send(200, "text/plain; version=0.0.4; charset=utf-8", "");
     auto client = web.client();
     client.setNoDelay(true);
-    size_t enviado = 0;
-    while (enviado < body.length()) {
-        size_t bloco = min(size_t(512), body.length() - enviado);
-        size_t gravado = client.write(reinterpret_cast<const uint8_t*>(body.c_str() + enviado), bloco);
-        if (!gravado) {
-            ++errors;
-            Serial.printf("[METRICS] Envio interrompido: %u/%u bytes, heap=%u.\n",
-                          unsigned(enviado), unsigned(body.length()), ESP.getFreeHeap());
-            client.stop();
-            return;
-        }
-        enviado += gravado;
-        yield();
-    }
+    MetricsChunkStream stream(client);
+    exposition(stream);
+    lastExportFailed = !stream.flushBlock();
+    if (lastExportFailed) { ++exportsFailed; ++errors; }
+    else ++exportsOk;
+    lastExportDurationMs = millis() - started;
+    // WebServer finaliza a resposta chunked com o bloco zero ao retornar.
 }
-String MetricsService::exposition() const {
-    String out;
-    if (!out.reserve(6144)) return out;
+void MetricsService::exposition(Print& out) const {
     auto label = [](const char* name, const String& value) {
         return String(name) + "=\"" + escapeLabel(value) + "\"";
     };
     auto sample = [&](const char* name, const String& value, const String& labels = "",
                       const char* type = "gauge", bool describe = true) {
         if (describe) {
-            out += "# HELP " + String(name) + " Central: " + name + ".\n";
-            out += "# TYPE " + String(name) + " " + type + "\n";
+            out.print("# HELP "); out.print(name); out.print(" Central: "); out.print(name); out.print(".\n");
+            out.print("# TYPE "); out.print(name); out.print(' '); out.print(type); out.print('\n');
         }
-        out += String(name) + "{device=\"" + device + "\"";
-        if (labels.length()) out += "," + labels;
-        out += "} " + value + "\n";
+        out.print(name); out.print("{device=\""); out.print(device); out.print('"');
+        if (labels.length()) { out.print(','); out.print(labels); }
+        out.print("} "); out.print(value); out.print('\n');
     };
     bool online = WiFi.status() == WL_CONNECTED;
     sample("esp_info", "1", label("chip", ESP.getChipModel()) + ",model=\"ESP32-2432S028-Central\"");
@@ -298,6 +323,11 @@ String MetricsService::exposition() const {
         if (esp_wifi_get_max_tx_power(&power) == ESP_OK) sample("esp_wifi_tx_power", String(power / 4.0f, 2));
     }
     sample("esp_wifi_disconnect_count", String(disconnects.load()));
+    auto udpStats = udp.snapshotMetricas();
+    sample("esp_udp_listener_up", udpStats.listenerUp ? "1" : "0");
+    sample("esp_udp_packets_received_total", String(udpStats.pacotesRecebidos), "", "counter");
+    sample("esp_udp_replies_sent_total", String(udpStats.respostasEnviadas), "", "counter");
+    sample("esp_udp_send_errors_total", String(udpStats.errosEnvio), "", "counter");
     sample("esp_cpu_frequency_mhz", String(ESP.getCpuFreqMHz()));
     if (isfinite(cpuUsage)) sample("esp_cpu_usage_percent", String(cpuUsage, 3));
     float temp = temperatureRead();
@@ -315,6 +345,11 @@ String MetricsService::exposition() const {
     sample("esp_heap_free_bytes", String(ESP.getFreeHeap()));
     sample("esp_heap_total_bytes", String(ESP.getHeapSize()));
     sample("esp_heap_minimum_free_bytes", String(ESP.getMinFreeHeap()));
+    sample("esp_heap_8bit_free_bytes", String(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
+    sample("esp_heap_8bit_largest_free_block_bytes", String(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
+    sample("esp_metrics_exports_total", String(exportsOk), "", "counter");
+    sample("esp_metrics_export_errors_total", String(exportsFailed), "", "counter");
+    sample("esp_screensaver_active", central.protecaoTelaAtiva() ? "1" : "0");
     sample("esp_psram_free_bytes", String(ESP.getFreePsram()));
     sample("esp_psram_total_bytes", String(ESP.getPsramSize()));
     if (partitionBytes) sample("esp_flash_usage_percent", String(100.0 * imageBytes / partitionBytes, 3));
@@ -341,5 +376,4 @@ String MetricsService::exposition() const {
             sample("sdcard_log_size_bytes", String(sd.tamanhoLog));
         }
     }
-    return out;
 }

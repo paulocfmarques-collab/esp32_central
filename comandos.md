@@ -66,7 +66,7 @@ selecionado na tela.
 | `lastcmd` | Ultimo comando processado, excetuando `lastcmd` e `cmdcount`. |
 | `cmdcount` | Contador de comandos desde o boot, excetuando essas duas consultas. |
 | `reset_counters` | Zera somente os contadores persistentes de boot/watchdog no namespace `telemetry`; preserva as configurações Prometheus. |
-| `help` | Destinado a listar comandos; veja a limitacao atual abaixo. |
+| `help` | Lista os comandos locais no formato `COMANDOS`, com um comando por linha. |
 | `vago` | Responde que o slot esta vazio; os botoes `[ VAGO ]` nao disparam esse comando. |
 
 ### Relatorio de crash
@@ -189,8 +189,6 @@ e `net_info`.
 
 ## Limites conhecidos do firmware atual
 
-- `help` tem sua lista sobrescrita pelo ramo de comando desconhecido no
-  dispatcher atual. Este documento e a referencia enquanto isso nao for corrigido.
 - O percentual de uso de `psram` nao e confiavel quando nao ha PSRAM:
   o calculo atual divide pela capacidade zero.
 - Os argumentos numericos usam conversao permissiva. Envie numeros validos,

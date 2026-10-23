@@ -10,6 +10,12 @@ instalado; a data de um commit nao determina a versao gravada na placa.
 
 ## Nao publicado
 
+### Formato do comando help
+
+- Padronizada a resposta com o cabeçalho `COMANDOS` e um comando por linha,
+  removendo texto explicativo da lista para facilitar o parseamento.
+- Atualizados os guias local e consolidado.
+
 ### Contadores persistentes
 
 - Adicionado `reset_counters` para zerar somente o registro de boot/watchdog

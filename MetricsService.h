@@ -23,7 +23,13 @@ public:
     void start();
     void process();
     static bool resetCounters();
+    static String diagnostico();
 private:
+    inline static MetricsService* instance = nullptr;
+    uint64_t exportsOk = 0, exportsFailed = 0;
+    uint32_t lastExportAt = 0, lastExportDurationMs = 0;
+    uint32_t lastFree8 = 0, lastLargest8 = 0;
+    bool lastExportFailed = false;
     Settings config{};
     struct BootRecord { uint32_t version, boots, watchdogs; } boot{};
     bool countersOk = false, pending = false;
@@ -49,7 +55,7 @@ private:
     void show(int status = 200, const String& notice = "");
     void handleSave();
     void sendMetrics(WebServer& web);
-    String exposition() const;
+    void exposition(Print& out) const;
     String yaml() const;
     static String escapeLabel(String value);
     static String escapeHtml(String value);

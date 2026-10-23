@@ -43,6 +43,8 @@ class InterfaceCentral
         return (int)_modoOperacao;
     }
 
+    bool protecaoTelaAtiva() const { return _protecaoTelaAtiva; }
+
     int obterEscravoAtivoAlvo() const
     {
         return _escravoAtivoAlvo;

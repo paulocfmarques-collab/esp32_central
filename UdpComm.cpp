@@ -1,11 +1,16 @@
 #include "UdpComm.h"
 #include "SdManager.h"
+#include <WiFi.h>
 
 UdpComm::UdpComm(int porta) 
   : _porta(porta), _tempoEnvio(0), _aguardandoResposta(false) {}
 
 void UdpComm::inicializar() {
-  _udp.begin(_porta);
+  bool aberto = _udp.begin(_porta) == 1;
+  portENTER_CRITICAL(&_metricasMux);
+  _metricas.listenerUp = aberto;
+  portEXIT_CRITICAL(&_metricasMux);
+  if (!aberto) Serial.println(F("[UDP] Falha ao abrir porta de escuta."));
   
   // Lê da Flash apenas UMA VEZ no setup e armazena na memória RAM (Cache de Proteção)
   _prefs.begin("wifi", true);
@@ -28,9 +33,9 @@ void UdpComm::enviarComando(const char* cmd, int numeroEscravo) {
     // Escoa/Limpa qualquer resíduo perdido no buffer antes de injetar uma nova transmissão
     _udp.flush(); 
     
-    _udp.beginPacket(targetIP, _porta);
-    _udp.print(cmd);
-    bool enviado = _udp.endPacket() == 1;
+    bool enviado = _udp.beginPacket(targetIP, _porta) == 1 &&
+                   _udp.print(cmd) == strlen(cmd) && _udp.endPacket() == 1;
+    registrarEnvio(enviado, false);
     SdManager::registrar(enviado ? "COMANDO_TX" : "FALHA_TX", "udp:ESP" + String(numeroEscravo) + ":" + destinoStr, cmd);
     Serial.print(F("[ESP TX "));
     Serial.print(numeroEscravo);
@@ -40,6 +45,7 @@ void UdpComm::enviarComando(const char* cmd, int numeroEscravo) {
     _tempoEnvio = millis();
     _aguardandoResposta = enviado;
   } else {
+    registrarEnvio(false, false);
     SdManager::registrar("FALHA_TX", "udp:ESP" + String(numeroEscravo), "IP invalido / comando: " + String(cmd));
   }
 }
@@ -47,6 +53,9 @@ void UdpComm::enviarComando(const char* cmd, int numeroEscravo) {
 bool UdpComm::escutarResposta(String& msgOut, bool& veioDeEscravoOut) {
   int packetSize = _udp.parsePacket();
   if (packetSize) {
+    portENTER_CRITICAL(&_metricasMux);
+    ++_metricas.pacotesRecebidos;
+    portEXIT_CRITICAL(&_metricasMux);
     char packetBuffer[1460]; 
     int len = _udp.read(packetBuffer, sizeof(packetBuffer) - 1);
     if (len > 0) {
@@ -105,8 +114,24 @@ String UdpComm::obterIpEscravo(int numeroEscravo) const {
 void UdpComm::responderRemoto(const String& msg) {
   IPAddress destino = _udp.remoteIP();
   uint16_t porta = _udp.remotePort();
-  _udp.beginPacket(destino, porta);
-  _udp.print(msg + "\n");
-  bool enviado = _udp.endPacket() == 1;
+  String conteudo = msg + "\n";
+  bool enviado = _udp.beginPacket(destino, porta) == 1 &&
+                 _udp.print(conteudo) == conteudo.length() && _udp.endPacket() == 1;
+  registrarEnvio(enviado, true);
   SdManager::registrar(enviado ? "RESPOSTA_TX" : "FALHA_TX", "udp:" + destino.toString() + ":" + String(porta), msg);
+}
+
+void UdpComm::registrarEnvio(bool sucesso, bool resposta) {
+  portENTER_CRITICAL(&_metricasMux);
+  if (!sucesso) ++_metricas.errosEnvio;
+  else if (resposta) ++_metricas.respostasEnviadas;
+  portEXIT_CRITICAL(&_metricasMux);
+}
+
+UdpComm::Metricas UdpComm::snapshotMetricas() const {
+  portENTER_CRITICAL(&_metricasMux);
+  Metricas copia = _metricas;
+  portEXIT_CRITICAL(&_metricasMux);
+  copia.listenerUp = copia.listenerUp && WiFi.status() == WL_CONNECTED;
+  return copia;
 }

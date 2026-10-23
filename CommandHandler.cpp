@@ -2,6 +2,7 @@
 #include "MetricsService.h"
 #include "SdManager.h"
 #include "CrashDiagnostics.h"
+#include <esp_heap_caps.h>
 #define SD_RESP_MAX 1000
 
 static bool sdCaminhoValido(const String& p)
@@ -272,24 +273,54 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp, 
 
     if (cmd == "help")
     {
-        resp = "===== COMANDOS ACEITOS =====\n"
-               "help / info / status / reason / crash_info\n"
-               "version / build / cpu / ram / reset_counters\n"
-               "flash / temp / mac / net_info\n"
-               "uptime / time / date / scan / reboot / name\n"
-               "--- CONFIGURACOES ---\n"
-               "set_fuso:[num] (Ex: set_fuso:-3)\n"
-               "reset_wifi : Limpa Flash e abre AP\n"
-               "set_escravo[1-4]:[IP]\n"
-               "--- SD CARD ---\n"
-               "sd_status / sd_test / sd_log / sd_remount\n"
-               "sd_list[:/pasta] / sd_read:/arq\n"
-               "sd_write:/arq:txt / sd_append:/arq:txt\n"
-               "sd_del:/arq / sd_mkdir:/p / sd_rmdir:/p\n"
-               "sd_clear_log\n"
-               "--- SERIAL USB ---\n"
-               "115200 baud / finalizar com CR ou LF\n"
-               "Respostas: [RESPOSTA] ate [FIM RESPOSTA]";
+        resp = "COMANDOS\n"
+               "help\n"
+               "name\n"
+               "info\n"
+               "status\n"
+               "reason\n"
+               "crash_info\n"
+               "version\n"
+               "build\n"
+               "uptime\n"
+               "lastcmd\n"
+               "cmdcount\n"
+               "reset_counters\n"
+               "vago\n"
+               "reboot\n"
+               "reset_wifi\n"
+               "desligar\n"
+               "cpu\n"
+               "ram\n"
+               "metrics_diag\n"
+               "flash\n"
+               "temp\n"
+               "psram\n"
+               "mac\n"
+               "net_info\n"
+               "scan\n"
+               "time\n"
+               "date\n"
+               "set_fuso:N\n"
+               "led_on\n"
+               "led_off\n"
+               "led_blink:ms\n"
+               "set_escravo1:IP\n"
+               "set_escravo2:IP\n"
+               "set_escravo3:IP\n"
+               "set_escravo4:IP\n"
+               "sd_status\n"
+               "sd_test\n"
+               "sd_log\n"
+               "sd_remount\n"
+               "sd_list:[pasta]\n"
+               "sd_read:arquivo\n"
+               "sd_write:arquivo:texto\n"
+               "sd_append:arquivo:texto\n"
+               "sd_del:arquivo\n"
+               "sd_mkdir:pasta\n"
+               "sd_rmdir:pasta\n"
+               "sd_clear_log\n";
     }
     else if (cmd == "reset_counters")
     {
@@ -489,12 +520,18 @@ void CommandHandler::executar(const String& cmdBruto, bool requisicaoRemotaUdp, 
                "Cores: " + String(ESP.getChipCores()) + "\n" +
                "Freq: " + String(ESP.getCpuFreqMHz()) + " MHz\n";
     }
+    else if (cmd == "metrics_diag")
+    {
+        resp = MetricsService::diagnostico();
+    }
     else if (cmd == "ram")
     {
         resp = "Central Local RAM:\nHeap Total: " + String(ESP.getHeapSize() / 1024.0) + " KB\n" +
                "Heap Livre: " + String(ESP.getFreeHeap() / 1024.0) + " KB\n" +
                "Menor Bloco Livre: " + String(ESP.getMinFreeHeap() / 1024.0) + " KB\n" +
                "Maior Bloco Livre: " + String(ESP.getMaxAllocHeap() / 1024.0) + " KB\n" +
+               "Heap 8 bits livre: " + String(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)) + " bytes\n" +
+               "Maior bloco 8 bits: " + String(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)) + " bytes\n" +
                "RAM Utilizada: " +
                String(100.0 * (ESP.getHeapSize() - ESP.getFreeHeap()) / ESP.getHeapSize()) + " %\n";
     }

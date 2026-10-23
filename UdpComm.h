@@ -7,6 +7,11 @@
 
 class UdpComm {
 public:
+    struct Metricas {
+        bool listenerUp = false;
+        uint64_t pacotesRecebidos = 0, respostasEnviadas = 0, errosEnvio = 0;
+    };
+    Metricas snapshotMetricas() const;
     UdpComm(int porta);
     void inicializar();
     void enviarComando(const char* cmd, int numeroEscravo);
@@ -19,6 +24,9 @@ public:
     String obterIpRemotoReal() { return _udp.remoteIP().toString(); }
 
 private:
+    mutable portMUX_TYPE _metricasMux = portMUX_INITIALIZER_UNLOCKED;
+    Metricas _metricas;
+    void registrarEnvio(bool sucesso, bool resposta);
     WiFiUDP _udp;
     Preferences _prefs;
     int _porta;

@@ -31,3 +31,7 @@ antes de apagar o registro interno. Sem SD gravavel, preserva o registro.
 Sem hora sincronizada, usa `SEM_NTP` e uptime no nome. Nomes repetidos recebem
 um sufixo numerico. O comando `reason` continua indicando o motivo do ultimo
 reset mesmo depois de apagar o core dump.
+
+Para falhas de Prometheus sem reset, use `metrics_diag` e `ram`. O primeiro
+mostra a ultima tentativa de exportacao, memoria utilizavel, estado do Matrix
+e fila de comandos; o segundo inclui RAM livre e maior bloco de 8 bits.
